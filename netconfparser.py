@@ -279,9 +279,9 @@ if __name__ == "__main__":
         window = tk.Tk()
         s = ttk.Style()
         # workaround for row coloring
-        if window.getvar('tk_patchLevel') == '8.6.9':
-            def fixed_map(option):
-                return [elm for elm in s.map('Treeview', query_opt=option) if elm[:2] != ('!disabled', '!selected')]
+        #if window.getvar('tk_patchLevel') == '8.6.9':
+        def fixed_map(option):
+            return [elm for elm in s.map('Treeview', query_opt=option) if elm[:2] != ('!disabled', '!selected')]
         s.map('Treeview', foreground=fixed_map('foreground'),
               background=fixed_map('background'))
         # end workaround
