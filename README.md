@@ -1,3 +1,8 @@
+# NetConfParser
+NetConfParser is a tool that helps you analyze the rpcs coming and going from a netconf client to 
+a server 
+
+
 # Building NetConfParser
 NetConfParser can be built for Windows with pyinstaller
 * pyinstaller  --windowed --icon=fs.ico -F netconfparser.py --add-data "fs_ico_encoded;."
@@ -21,8 +26,8 @@ A tree will appear on the left frame
 # Reading the output tree
 Output tree is on the left frame
 In yellow you have the hello and the notifications
-In blue the rpcs coming from ODU
-In green the rpc responses coming from ORU
+In blue the rpcs coming from netconf client
+In green the rpc responses coming from netconf server
 You can expand the content of all messages by clicking the + on the left
 
 # Generating SCT file to reproduce PRs -- Not usable
