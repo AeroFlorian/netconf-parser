@@ -62,7 +62,6 @@ def parse_file(full_lines):
     global message_id_without_counterpart
     #Check if there is the log file will contain unwanted lines between messages
     if "INF Listening on 0.0.0.0:830 for SSH connections." in full_lines:
-        logger.info("Removing unwanted lines from log file")
         lines_filtered = [line for line in full_lines.split("\n") if ">" in line or "<" in line]
         full_lines = "\n".join(lines_filtered)
     reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
@@ -73,7 +72,6 @@ def parse_file(full_lines):
     all_matches = re.findall(reg, full_lines, re.MULTILINE|re.DOTALL)
     hello_req = False
     for i,element in enumerate(all_matches):
-        logger.info(element)
         #Hello case
         if element[5] != "":
             data = element[5]
