@@ -20,6 +20,7 @@ detached_items = []
 items = []
 received_rpcs = []
 message_id_without_counterpart = []
+VERSION = "v0.2"
 
 
 def wrap(string, length=100):
@@ -204,7 +205,7 @@ def handleOpenEvent(event):
     open_children(result_box.focus())
 
 def update_title(file):
-    window.title(f"NetConfParser - {file}")
+    window.title(f"NetConfParser {VERSION} - {file}")
 
 def load_file(file):
     clear_tree(None)
@@ -233,7 +234,7 @@ if __name__ == "__main__":
         s.map('Treeview', foreground=fixed_map('foreground'),
               background=fixed_map('background'))
         # end workaround
-        window.title('NetConfParser')
+        window.title(f'NetConfParser {VERSION}')
         window.wm_iconbitmap('fs.ico')
         window.iconbitmap('fs.ico')
         window.state('zoomed')

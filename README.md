@@ -1,6 +1,6 @@
 # NetConfParser
-NetConfParser is a tool that helps you analyze the rpcs coming and going from a netconf client to 
-a server 
+NetConfParser is a tool that helps you analyze the rpcs coming and going from a netconf client to
+a server
 
 
 # Building NetConfParser
@@ -17,6 +17,8 @@ Usage of NetConfParser is pretty straightforward
 # Loading log file
 You can either paste the entire content of the log file in the upper right text box
 Or use the load button which will open a dialog box
+Now you can also drag and drop your file over the window, it will be parsed directly.
+Path of the file will be displayed as the window title
 
 # Parsing log file
 After loading the log file, you will have it pasted in the upper right text box
@@ -28,10 +30,7 @@ Output tree is on the left frame
 In yellow you have the hello and the notifications
 In blue the rpcs coming from netconf client
 In green the rpc responses coming from netconf server
+In lightgreen the specific rpcs get-schema
 You can expand the content of all messages by clicking the + on the left
 
-# Generating SCT file to reproduce PRs -- Not usable
-Under the lower right text box press the button Generate SCT
-Text will appear in the lower right text box
-Use then Copy To Clipboard button to copy
 
