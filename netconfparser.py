@@ -60,14 +60,20 @@ def json_tree(parent, dictionary, tags, depth=0):
 
 def parse_file(full_lines):
     global message_id_without_counterpart
+    #Check if there is the log file will contain unwanted lines between messages
+    if "INF Listening on 0.0.0.0:830 for SSH connections." in full_lines:
+        logger.info("Removing unwanted lines from log file")
+        lines_filtered = [line for line in full_lines.split("\n") if ">" in line or "<" in line]
+        full_lines = "\n".join(lines_filtered)
     reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
           r'<rpc-reply .*? message-id=.(\d+).>(.*?)</rpc-reply>|' \
-          r'<notification xmlns=\".*?\">.*eventTime>(.*?)</notification>|'\
+          r'<notification .*?/eventTime>(.*?)</notification>|'\
           r'<hello xmlns=\".*?\">(.*?)</hello>'
 
     all_matches = re.findall(reg, full_lines, re.MULTILINE|re.DOTALL)
     hello_req = False
     for i,element in enumerate(all_matches):
+        logger.info(element)
         #Hello case
         if element[5] != "":
             data = element[5]
@@ -99,6 +105,7 @@ def parse_file(full_lines):
             data = element[3]
             d = "<-"
             if "rpc-error" in data:
+                data = f"<rpc-error>{data}</rpc-error>"
                 tags = "rpc-error"
             else:
                 tags = "resp"
@@ -107,16 +114,19 @@ def parse_file(full_lines):
             data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
             data = re.sub(r'^.*?<', '<', data, flags=re.DOTALL)
             data = re.sub(r'>[^>]*?$', '>', data, flags=re.DOTALL)
-            data = re.sub(r'} {', '', data, flags=re.DOTALL)
         elif element[4] != "": #notification case
             message_type = "notification"
-            message_id = "0"
+            message_id = "N/A"
             data = element[4]
             d = "<-"
-            tags = "notification"
+            if "netconf-config-change" in data:
+                tags = "config-change"
+            else:
+                tags = "notif"
             data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
 
         try:
+            data = re.sub(r'} {', '', data, flags=re.DOTALL)
             dic = xmltodict.parse(data)
         except Exception as e:
             dic = {"": f"Failed to parse data: {e}"}
@@ -180,7 +190,8 @@ def get_text_box(event):
     result_box.tag_configure("req", background='lightblue')
     result_box.tag_configure("schema", background='#70c38e')
     result_box.tag_configure("resp", background='lightgreen')
-    result_box.tag_configure("notif", background='lightyellow')
+    result_box.tag_configure("notif", background='#faebd7')
+    result_box.tag_configure("netconf-config-change", background='#cd9575')
     result_box.tag_configure("rpc-error", background='red')
     result_box.tag_configure("no-counterpart", background='orange')
 
@@ -210,7 +221,6 @@ def update_title(file):
 def load_file(file):
     clear_tree(None)
     text_box.delete('1.0', tk.END)
-    logger.info(f"Loading file: {file.data}")
     with open(file.data, 'r') as f:
         text_box.insert('1.0', f.readlines())
     get_text_box(None)
