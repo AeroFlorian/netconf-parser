@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkinter import filedialog
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 import time
 from Logger import logger
@@ -30,113 +31,102 @@ def json_tree(parent, dictionary, tags, depth=0):
         uid = uuid.uuid4()
         if isinstance(dictionary[key], dict):
             result_box.insert(parent, 'end', uid, text='', values=(
-                "", "", "", "\t"*depth + key, ""), tags=tags)
-            json_tree(uid, dictionary[key], tags, depth+1)
+                "", "", "", "\t" * depth + key, ""), tags=tags)
+            json_tree(uid, dictionary[key], tags, depth + 1)
         elif isinstance(dictionary[key], list):
             json_tree(parent,
-                      dict([(key+(" "*i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1)
+                      dict([(key + (" " * i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1)
         else:
             value = dictionary[key]
+            key_without_ns = key.split(':')[-1]
             if value is None:
                 value = ""
-            result_box.insert(parent, 'end', uid, text='', values=(
-                "", "", "", "\t"*depth + str(key), wrap(value)), tags=tags)
+            vl = value.split("\n")
+            vl_wrapped = []
+            for v in vl:
+                for x in textwrap.wrap(v, 100):
+                    vl_wrapped.append(x)
+            vl = vl_wrapped
+            if len(vl) > 1:
+                for i, v in enumerate(vl):
+                    uid = uuid.uuid4()
+                    result_box.insert(parent, 'end', uid, text='', values=(
+                        "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v)), tags=tags)
+            else:
+                result_box.insert(parent, 'end', uid, text='', values=(
+                "", "", "", "\t" * depth + str(key_without_ns), wrap(value)), tags=tags)
 
 
-def parse_line(line, i):
+def parse_file(full_lines):
     global message_id_without_counterpart
-    # rpc
-    reg = r'.*(<rpc xmlns=\".*\" message-id=\"(\d+)\">(.*)</rpc>)'
-    gr = re.match(reg, line)
-    if gr is not None:
-        message_type = "rpc"
-        message_id = gr.group(2)
-        data = gr.group(3)
-        d = "->"
-        tags = "req"
-        message_id_without_counterpart.append(int(message_id))
-        if "get-schema" not in data:
-            received_rpcs.append(data)
-        data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
+    reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
+          r'<rpc-reply .*? message-id=.(\d+).>(.*?)</rpc-reply>|' \
+          r'<notification xmlns=\".*?\">.*eventTime>(.*?)</notification>|'\
+          r'<hello xmlns=\".*?\">(.*?)</hello>'
 
-        try:
-            dic = xmltodict.parse(data)
-        except Exception as e:
-            dic = {"": "Failed to parse data"}
-        uid = uuid.uuid4()
-        parent = result_box.insert('', 'end', text='', values=(
-            message_id, d, message_type, "", ""), tags=tags)
-        json_tree(parent, dic, tags)
-        return
-
-    reg = r'.*<rpc-reply xmlns=\".*\" message-id=\"(\d+)\">(.*)</rpc-reply>'
-    gr = re.match(reg, line)
-    if gr is not None:
-        message_type = "rpc-reply"
-        message_id = gr.group(1)
-        data = gr.group(2)
-        d = "<-"
-        lis = [x for x in message_id_without_counterpart if x !=
-               int(message_id)]
-        message_id_without_counterpart = lis
-        if "rpc-error" in data:
-            tags = "rpc-error"
-        else:
-            tags = "resp"
-        data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
-        try:
-            dic = xmltodict.parse(data)
-        except Exception as e:
-            dic = {"": "Failed to parse data"}
-        uid = uuid.uuid4()
-        parent = result_box.insert('', 'end', text='', values=(
-            message_id, d, message_type, "", ""), tags=tags)
-        json_tree(parent, dic, tags)
-        return
-
-    # notification
-    reg = r'.*<notification xmlns=\".*\">.*eventTime>(.*)</notification>'
-    gr = re.match(reg, line)
-    if gr is not None:
-        message_type = "notification"
-        data = gr.group(1)
-        d = "<-"
-        data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
-        try:
-            dic = xmltodict.parse(data)
-        except Exception as e:
-            dic = {"": "Failed to parse data"}
-
-        parent = result_box.insert(parent='', index=i, iid=i, text='', values=(
-            "N/A", d, message_type, "", ""), tags="notif")
-        json_tree(parent, dic, "notif")
-        return
-
-    # hello
-    reg = r'.*(<hello xmlns=\".*\">(.*)</hello>)'
-    gr = re.match(reg, line)
-    if gr is not None:
-        message_type = "hello"
-        data = gr.group(2)
-        if len(data) >= 400:
-            d = "<-"
-        else:
+    all_matches = re.findall(reg, full_lines, re.MULTILINE|re.DOTALL)
+    hello_req = False
+    for i,element in enumerate(all_matches):
+        #Hello case
+        if element[5] != "":
+            data = element[5]
+            message_type = "hello"
+            message_id = "0"
+            data = element[5]
+            d = "->" if not hello_req else "<-"
+            tags = "hello"
+            hello_req = not hello_req
+            data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
+            data = re.sub(r'<session-id.*/session-id>', '', data)
+        elif element[0] != "": #rpc case
+            message_type = "rpc"
+            message_id = element[0]
+            data = element[1]
             d = "->"
-        data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
-        data = re.sub(r'<session-id.*/session-id>', '', data)
+            tags = "req"
+            if "get-schema" not in data:
+                message_id_without_counterpart.append(int(message_id))
+            else:
+                message_type = "get-schema"
+                tags = "schema"
+            data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
+
+        elif element[2] != "": #rpc-reply case
+
+            message_type = "rpc-reply"
+            message_id = element[2]
+            data = element[3]
+            d = "<-"
+            if "rpc-error" in data:
+                tags = "rpc-error"
+            else:
+                tags = "resp"
+            if int(message_id) in message_id_without_counterpart:
+                message_id_without_counterpart.remove(int(message_id))
+            data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
+            data = re.sub(r'^.*?<', '<', data, flags=re.DOTALL)
+            data = re.sub(r'>[^>]*?$', '>', data, flags=re.DOTALL)
+            data = re.sub(r'} {', '', data, flags=re.DOTALL)
+        elif element[4] != "": #notification case
+            message_type = "notification"
+            message_id = "0"
+            data = element[4]
+            d = "<-"
+            tags = "notification"
+            data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
+
         try:
             dic = xmltodict.parse(data)
         except Exception as e:
-            dic = {"": "Failed to parse data"}
-
-        parent = result_box.insert(parent='', index=i, iid=i, text='', values=(
-            "N/A", d, message_type, "", ""), tags="hello")
-        json_tree(parent, dic, "hello")
-        return
+            dic = {"": f"Failed to parse data: {e}"}
+        parent = result_box.insert('', 'end', text='', values=(
+            message_id, d, message_type, "", ""), tags=tags)
+        json_tree(parent, dic, tags)
 
 
 def search_in_element(query, element):
-    if query.lower() in str(result_box.item(element)['values'][2]) or query.lower() in str(result_box.item(element)['values'][3]) or query.lower() in str(result_box.item(element)['values'][4]):
+    if query.lower() in str(result_box.item(element)['values'][2]) or query.lower() in str(
+            result_box.item(element)['values'][3]) or query.lower() in str(result_box.item(element)['values'][4]):
         return True
     result = False
     for child in result_box.get_children(element):
@@ -175,57 +165,19 @@ def clear_tree(event):
     message_id_without_counterpart.clear()
 
 
-def check_if_line_is_xml(line):
-    return line.count('>') > 1 and line.count('</') > 0
-
-
-def check_if_line_is_well_formed(line):
-    reg = r'^[^<]*(<.*>)'
-    gr = re.match(reg, line)
-    if gr is not None:
-        try:
-            dic = xmltodict.parse(gr.group(1))
-            return True
-        except Exception as e:
-            return False
-    return False
-
-
-def aggregate_lines(full_lines):
-    buffer = ""
-    for line in full_lines:
-        if check_if_line_is_xml(line):
-            if check_if_line_is_well_formed(line):
-                lines.append(line)
-                buffer = ""
-            else:
-                buffer = buffer + line
-                #buffer = re.sub(r'xmlns[a-z:-]+=\"[^\"]+\"', '', buffer)
-                if check_if_line_is_well_formed(buffer):
-                    lines.append(buffer)
-                    buffer = ""
-
-
 def get_text_box(event):
     result_box.delete(*result_box.get_children())
     full = text_box.get("1.0", tk.END)
-    full_lines = []
-    for line in full.split('\n'):
-        line = line.strip()
-        if len(line) > 0:
-            full_lines.append(line)
-    aggregate_lines(full_lines)
     text_box.delete("1.0", tk.END)
-    i = 0
-    for l in lines:
-        parse_line(l, i)
-        i = i+1
+    parse_file(full)
     # Apply no counterparts tag
     for child in result_box.get_children():
-        if result_box.item(child)['values'][0] != "N/A" and int(result_box.item(child)['values'][0]) in message_id_without_counterpart:
+        if result_box.item(child)['values'][0] != "N/A" and int(
+                result_box.item(child)['values'][0]) in message_id_without_counterpart:
             result_box.item(child, tags=['no-counterpart'])
     result_box.tag_configure("hello", background='lightyellow')
     result_box.tag_configure("req", background='lightblue')
+    result_box.tag_configure("schema", background='#70c38e')
     result_box.tag_configure("resp", background='lightgreen')
     result_box.tag_configure("notif", background='lightyellow')
     result_box.tag_configure("rpc-error", background='red')
@@ -243,45 +195,41 @@ def copy_to_clipboard(event):
     window.clipboard_append(full)
     window.update()
 
+def open_children(parent):
+    result_box.item(parent, open=True)
+    for child in result_box.get_children(parent):
+        open_children(child)
 
-def generate_sct_file(event):
-    header_sct = '''#!/usr/bin/env python3
-from utils import connect_to_cli
-from utils import shutdown_cli
-from utils import expect_command_ok
-import time
+def handleOpenEvent(event):
+    open_children(result_box.focus())
 
-def setup_module():
-    connect_to_cli()
+def update_title(file):
+    window.title(f"NetConfParser - {file}")
 
-def teardown_module():
-    shutdown_cli()
-
-def test_PR_REPRODUCTION():
-'''
-    sct_box.insert('end', header_sct)
-    for rpc in received_rpcs:
-        RPC = '<?xml version="1.0"?>{}'.format(rpc)
-        sct_box.insert(
-            'end', '    with open("/tmp/test_sct_from_parser.xml", "w") as test_file:\n')
-        sct_box.insert('end', '        test_file.write(\'{}\')\n'.format(RPC))
-        sct_box.insert('end', '        test_file.close()\n')
-
-        sct_box.insert(
-            'end', '    expect_command_ok(\'user-rpc --content /tmp/test_sct_from_parser.xml\\r\')\n')
-        sct_box.insert('end', '    time.sleep(1)\n')
+def load_file(file):
+    clear_tree(None)
+    text_box.delete('1.0', tk.END)
+    logger.info(f"Loading file: {file.data}")
+    with open(file.data, 'r') as f:
+        text_box.insert('1.0', f.readlines())
+    get_text_box(None)
+    update_title(file.data)
 
 
 if __name__ == "__main__":
 
     try:
         uu.decode('fs_ico_encoded', 'fs.ico')
-        window = tk.Tk()
+        window = TkinterDnD.Tk()
         s = ttk.Style()
+
+
         # workaround for row coloring
-        #if window.getvar('tk_patchLevel') == '8.6.9':
+        # if window.getvar('tk_patchLevel') == '8.6.9':
         def fixed_map(option):
             return [elm for elm in s.map('Treeview', query_opt=option) if elm[:2] != ('!disabled', '!selected')]
+
+
         s.map('Treeview', foreground=fixed_map('foreground'),
               background=fixed_map('background'))
         # end workaround
@@ -295,7 +243,6 @@ if __name__ == "__main__":
         label = tk.Label(master=frame_r, text="Paste log here")
         text_box = tk.Text(master=frame_r)
         sct_box = tk.Text(master=frame_r)
-        generate_sct = tk.Button(master=frame_r, text="Generate SCT file")
         copy_sct = tk.Button(master=frame_r, text="Copy to clipboard")
         filter_text = tk.Entry(master=frame_l)
         filter_button = tk.Button(master=frame_l, text="Filter")
@@ -320,6 +267,8 @@ if __name__ == "__main__":
         result_box.heading('data', text='data', anchor=tk.CENTER)
         result_box.heading('data2', text='', anchor=tk.CENTER)
 
+        result_box.bind('<<TreeviewOpen>>', handleOpenEvent)
+
         sb = tk.Scrollbar(frame_l, orient=tk.VERTICAL)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
         sb2 = tk.Scrollbar(frame_l, orient=tk.HORIZONTAL)
@@ -343,14 +292,17 @@ if __name__ == "__main__":
         label.place(y=10, relx=.5, anchor="center")
         text_box.place(x=10, y=20, width=80, height=200)
 
+        text_box.drop_target_register(DND_FILES)
+        text_box.dnd_bind('<<Drop>>', load_file)
+        result_box.drop_target_register(DND_FILES)
+        result_box.dnd_bind('<<Drop>>', load_file)
+
         result_box.place(y=50, relwidth=1.0, relheight=0.95)
         parse_button.bind("<Button-1>", get_text_box)
         parse_button.place(y=240, relx=.5, anchor="center")
         load_button.bind("<Button-1>", load_file)
         load_button.place(y=280, relx=.5, anchor="center")
         sct_box.place(x=10, y=300, width=80, height=200)
-        generate_sct.place(y=520, relx=.5, anchor="center")
-        generate_sct.bind("<Button-1>", generate_sct_file)
         copy_sct.place(y=560, relx=.5, anchor="center")
         copy_sct.bind("<Button-1>", copy_to_clipboard)
 
