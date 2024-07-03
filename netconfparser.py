@@ -1,4 +1,5 @@
 import tkinter as tk
+# import ttkbootstrap as ttk
 from tkinter import ttk
 from tkinter import filedialog
 from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -21,7 +22,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.3"
+VERSION = "v0.4"
 
 
 def wrap(string, length=100):
@@ -485,7 +486,7 @@ def parse_file(full_lines):
             if tags == "req":
                 if "get" in dic:
                     try:
-                        message_summary = f"get {''.join(dic['get']['filter'].keys())}"
+                        message_summary = f"get {'|'.join(dic['get']['filter'].keys())}"
                     except:
                         message_summary = "get"
                 elif "edit-config" in dic:
@@ -497,7 +498,17 @@ def parse_file(full_lines):
                     message_summary = f"rpc {''.join(dic.keys())}"
             elif tags == "notif":
                 message_summary = f"notification {''.join(dic.keys())}"
-
+            elif tags == "hello":
+                capas = set()
+                capabilities = list(dic["capabilities"].values())
+                if type(capabilities[0]) is list:
+                    capabilities = capabilities[0]
+                for capa in capabilities:
+                    if "urn:ietf:params:netconf:base:" in capa:
+                        capas.add(capa.split(":")[-1])
+                message_summary = f"Netconf Version Supported {', '.join(capas)}"
+            elif tags == "schema":
+                message_summary = f"get-schema {dic['get-schema']['identifier']}"
         except Exception as e:
             dic = {"": f"Failed to parse data: {e}"}
         analyze_rpc_for_oran(dic, message_type, d, message_id)
@@ -639,6 +650,7 @@ if __name__ == "__main__":
         uu.decode('fs_ico_encoded', 'fs.ico')
         window = TkinterDnD.Tk()
         s = ttk.Style()
+        #window = ttk.Window(themename="solar")
 
 
         # workaround for row coloring
