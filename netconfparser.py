@@ -20,23 +20,26 @@ detached_items = []
 items = []
 received_rpcs = []
 message_id_without_counterpart = []
-VERSION = "v0.2"
+oran_steps = []
+VERSION = "v0.3"
 
 
 def wrap(string, length=100):
     return '\n'.join(textwrap.wrap(string, length))
 
 
-def json_tree(parent, dictionary, tags, depth=0):
+def json_tree(parent, dictionary, tags, depth=0, box=None):
+    if box is None:
+        box = result_box
     for key in dictionary:
         uid = uuid.uuid4()
         if isinstance(dictionary[key], dict):
-            result_box.insert(parent, 'end', uid, text='', values=(
+            box.insert(parent, 'end', uid, text='', values=(
                 "", "", "", "\t" * depth + key, ""), tags=tags)
-            json_tree(uid, dictionary[key], tags, depth + 1)
+            json_tree(uid, dictionary[key], tags, depth + 1, box=box)
         elif isinstance(dictionary[key], list):
             json_tree(parent,
-                      dict([(key + (" " * i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1)
+                      dict([(key + (" " * i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1, box=box)
         else:
             value = dictionary[key]
             key_without_ns = key.split(':')[-1]
@@ -51,11 +54,365 @@ def json_tree(parent, dictionary, tags, depth=0):
             if len(vl) > 1:
                 for i, v in enumerate(vl):
                     uid = uuid.uuid4()
-                    result_box.insert(parent, 'end', uid, text='', values=(
+                    box.insert(parent, 'end', uid, text='', values=(
                         "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v)), tags=tags)
             else:
-                result_box.insert(parent, 'end', uid, text='', values=(
+                box.insert(parent, 'end', uid, text='', values=(
                 "", "", "", "\t" * depth + str(key_without_ns), wrap(value)), tags=tags)
+
+def get_value_if_exists_recurse(dic, key):
+    for (k,v) in dic.items():
+        if k == key:
+            return v
+        elif isinstance(v, dict):
+            val = get_value_if_exists_recurse(v, key)
+            if val is not None:
+                return val
+    return None
+
+def get_all_values_for_key_recurse(dic, key, values = []):
+    for (k,v) in dic.items():
+        if k == key:
+            values.append(v)
+        elif isinstance(v, dict):
+            get_all_values_for_key_recurse(v, key, values)
+    return values
+
+def check_value_if_exists_recurse(dic, value):
+    for (k,v) in dic.items():
+        if v == value:
+            return True
+        elif isinstance(v, dict):
+            return check_value_if_exists_recurse(v, value)
+    return False
+
+
+def display_list_tech(l):
+    return " + ".join([str(x) for x in l])
+
+
+def compute_cell_id(dn):
+    pattern = ".*?\.[A-Za-z]+(\d+).*"
+    match = re.match(pattern, dn)
+    if match:
+        return int(match.group(1))
+    return None
+
+def analyze_rpc_for_oran(dic, message_type, d, message_id):
+    global oran_steps
+    logger.info(f"Analyzing RPC for ORAN: {message_id}")
+    tags = "success"
+    if message_type == "hello" and d == '<-':
+        analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "✅", "Netconf Client Connected"), tags= "success")
+        logger.info("Netconf Client Connected")
+    elif message_type == "rpc-reply":
+        if "rpc-error" in dic:
+            analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "❎", f"RPC Error for message-id {message_id}"), tags="failure")
+            logger.error(f"RPC Error for message-id {message_id}")
+
+        elif get_value_if_exists_recurse(dic, "supported-mplane-version") is not None:
+            analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "✅", f"Supported MPLANE version: {get_value_if_exists_recurse(dic, 'supported-mplane-version')}"), tags=tags)
+            logger.info(f"Supported MPLANE version: {get_value_if_exists_recurse(dic, 'supported-mplane-version')}")
+        elif check_value_if_exists_recurse(dic, "o-ran-hw:O-RAN-RADIO"):
+            logger.info("Detected O-RAN-RADIO Hardware")
+            mfg_name = get_value_if_exists_recurse(dic, "mfg-name")
+            product_code = get_value_if_exists_recurse(dic, "product-code")
+            serial_num = get_value_if_exists_recurse(dic, "serial-num")
+            o_ran_name = get_value_if_exists_recurse(dic, "o-ran-name")
+            if o_ran_name is None or mfg_name is None or product_code is None or serial_num is None:
+                return
+            dict_to_display = {
+                "Detected Hardware": {
+                    "mfg-name": mfg_name,
+                    "product-code": product_code,
+                    "serial-num": serial_num,
+                    "o-ran-name": o_ran_name
+                }
+            }
+            parent = analysis_box.insert('', 'end', text='', values=(
+                f"{message_id}", "RU", "✅", f"O-DU Detects Hardware ", ""), tags=tags)
+            json_tree(parent, dict_to_display, tags, box=analysis_box)
+        elif get_value_if_exists_recurse(dic, "module-capability") is not None:
+            bands = get_all_values_for_key_recurse(dic, "band-capabilities", []) #band-capabilities is already a list
+            if bands:
+                dict_to_display = {
+                    "Bands Supported": [
+                        {
+                            "band-number": band["band-number"],
+                            "supported-technology-dl": display_list_tech(band["supported-technology-dl"]) if "supported-technology-dl" in band else "",
+                            "supported-technology-ul": display_list_tech(band["supported-technology-ul"]) if "supported-technology-ul" in band else ""
+                        }
+                    for band in bands[0]]
+                }
+                tags = "success"
+                parent = analysis_box.insert('', 'end', text='', values=(
+                    f"{message_id}", "RU", "✅", f"O-DU Gets Module Capabilities", ""), tags=tags)
+                json_tree(parent, dict_to_display, tags, box=analysis_box)
+        elif get_value_if_exists_recurse(dic, "user-plane-configuration") is not None:
+            tx_arrays = get_all_values_for_key_recurse(dic, "tx-arrays", [])
+            rx_arrays = get_all_values_for_key_recurse(dic, "rx-arrays", [])
+            def get_supported_techs(array, direction):
+                try:
+                    return display_list_tech(array["capabilities"][f"supported-technology-{direction}"])
+                except:
+                    return ""
+            if tx_arrays:
+                dict_to_display = {
+                    "User Plane Configuration": {
+                        "tx-arrays": [
+                            {
+                                "tx-array" : tx_array["name"],
+                                "band-number": tx_array["band-number"],
+                                "supported-technology-dl": get_supported_techs(tx_array, "dl"),
+                            }
+                        for tx_array in tx_arrays[0]]
+                    }
+                }
+                parent = analysis_box.insert('', 'end', text='', values=(
+                    f"{message_id}", "RU", "✅", f"O-DU Gets Tx-Arrays list", ""), tags=tags)
+                json_tree(parent, dict_to_display, tags, box=analysis_box)
+            if rx_arrays:
+                dict_to_display = {
+                    "User Plane Configuration": {
+                        "rx-array": [
+                            {
+                                "name" : rx_array["name"],
+                                "band-number": rx_array["band-number"],
+                                "supported-technology-ul": get_supported_techs(rx_array, "ul"),
+                            }
+                        for rx_array in rx_arrays[0]]
+                    }
+                }
+                parent = analysis_box.insert('', 'end', text='', values=(
+                    f"{message_id}", "RU", "✅", f"O-DU Gets Rx-Arrays list", ""), tags=tags)
+                json_tree(parent, dict_to_display, tags, box=analysis_box)
+
+    elif message_type == "rpc":
+        logger.info(f"RPC Message {dic}")
+        if "edit-config" in dic:
+            logger.info("Edit Config RPC")
+            if get_value_if_exists_recurse(dic, "user-plane-configuration") is not None:
+                logger.info("User Plane Configuration")
+                low_level_rx_endpoints = get_all_values_for_key_recurse(dic, "low-level-rx-endpoints", [])
+                low_level_tx_endpoints = get_all_values_for_key_recurse(dic, "low-level-tx-endpoints", [])
+                rx_array_carriers = get_all_values_for_key_recurse(dic, "rx-array-carriers", [])
+                tx_array_carriers = get_all_values_for_key_recurse(dic, "tx-array-carriers", [])
+                low_level_rx_links = get_all_values_for_key_recurse(dic, "low-level-rx-links", [])
+                low_level_tx_links = get_all_values_for_key_recurse(dic, "low-level-tx-links", [])
+
+                def get_type_from_endpoint(scs, dir):
+                    if dir == "ul":
+                        if scs == "KHZ_1_25":
+                            return "PRACH"
+                        return "DATA"
+                    else:
+                        if scs == "KHZ_240":
+                            return "SSB"
+                        return "DATA"
+
+                if low_level_rx_endpoints:
+                    dict_to_display = {
+                        "User Plane Configuration": {
+                            "low-level-rx-endpoints": [
+                                {
+                                    "name": rx_endpoint["name"],
+                                    "eaxc-id": get_value_if_exists_recurse(rx_endpoint, "eaxc-id"),
+                                    "type": get_type_from_endpoint(get_value_if_exists_recurse(rx_endpoint, "scs"), "ul")
+                                }
+                            for rx_endpoint in low_level_rx_endpoints[0]]
+                        }
+                    }
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", "Cell", "✅", f"O-DU Creates Low Level Rx-Endpoints", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+                if low_level_tx_endpoints:
+                    dict_to_display = {
+                        "User Plane Configuration": {
+                            "low-level-tx-endpoints": [
+                                {
+                                    "name": tx_endpoint["name"],
+                                    "eaxc-id": get_value_if_exists_recurse(tx_endpoint, "eaxc-id"),
+                                    "type": get_type_from_endpoint(get_value_if_exists_recurse(tx_endpoint, "scs"), "dl")
+                                }
+                            for tx_endpoint in low_level_tx_endpoints[0]]
+                        }
+                    }
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", "Cell", "✅", f"O-DU Creates Low Level Tx-Endpoints", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+                if low_level_rx_links:
+                    if type(low_level_rx_links[0]) is list:
+                        low_level_rx_links = low_level_rx_links[0]
+                    dict_to_display = {
+                        "User Plane Configuration": {
+                            "low-level-rx-links": [
+                                {
+                                    "name": rx_link["name"],
+                                    "rx-array-carrier": rx_link["rx-array-carrier"],
+                                    "low-level-rx-endpoint": rx_link["low-level-rx-endpoint"],
+                                    "cell_id": str(compute_cell_id(rx_link["name"]))
+                                }
+                            for rx_link in low_level_rx_links]
+                        }
+                    }
+                    cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-rx-links"]]))
+                    tags = f"cell_{cell_id}"
+                    number_low_level_rx_links = len(dict_to_display["User Plane Configuration"]["low-level-rx-links"])
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Creates {number_low_level_rx_links} Low Level Rx Links for cell {cell_id}", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+                if low_level_tx_links:
+                    if type(low_level_tx_links[0]) is list:
+                        low_level_tx_links = low_level_tx_links[0]
+                    dict_to_display = {
+                        "User Plane Configuration": {
+                            "low-level-tx-links": [
+                                {
+                                    "name": tx_link["name"],
+                                    "tx-array-carrier": tx_link["tx-array-carrier"],
+                                    "low-level-tx-endpoint": tx_link["low-level-tx-endpoint"],
+                                    "cell_id": str(compute_cell_id(tx_link["name"]))
+                                }
+                            for tx_link in low_level_tx_links]
+                        }
+                    }
+                    logger.info(f"Low Level Tx Links: {dict_to_display}")
+                    cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-tx-links"]]))
+                    tags = f"cell_{cell_id}"
+                    number_low_level_tx_links = len(dict_to_display["User Plane Configuration"]["low-level-tx-links"])
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Creates {number_low_level_tx_links} Low Level Tx Links for cell {cell_id}", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+                if rx_array_carriers:
+                    if type(rx_array_carriers[0]) is list:
+                        rx_array_carriers = rx_array_carriers[0]
+
+                    if get_value_if_exists_recurse(rx_array_carriers[0], "active") == "ACTIVE":
+                        mode = "Activation"
+                    elif get_value_if_exists_recurse(rx_array_carriers[0], "type") is not None:
+                        mode = "Creation"
+                    else:
+                        mode = "Deactivation"
+                    if mode == "Creation":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "rx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
+                                        "active": get_value_if_exists_recurse(array_carrier, "active"),
+                                        "type": get_value_if_exists_recurse(array_carrier, "type"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in rx_array_carriers]
+                            }
+                        }
+                    else:
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "rx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
+                                        "active": get_value_if_exists_recurse(array_carrier, "active"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in rx_array_carriers]
+                            }
+                        }
+                    cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["rx-array-carriers"]]))
+                    number_rx_array_carriers = len(dict_to_display["User Plane Configuration"]["rx-array-carriers"])
+                    type_cell = None
+                    tags = f"cell_{cell_id}"
+                    if mode == "Creation":
+                        type_cell = ' + '.join(set([ll["type"] for ll in dict_to_display["User Plane Configuration"]["rx-array-carriers"]])) + ' '
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Sends {mode} of {number_rx_array_carriers} Rx Array Carriers for {type_cell if type_cell else '' }cell {cell_id}", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+                if tx_array_carriers:
+                    if type(tx_array_carriers[0]) is list:
+                        tx_array_carriers = tx_array_carriers[0]
+
+                    if get_value_if_exists_recurse(tx_array_carriers[0], "active") == "ACTIVE":
+                        mode = "Activation"
+                    elif get_value_if_exists_recurse(tx_array_carriers[0], "type") is not None:
+                        mode = "Creation"
+                    else:
+                        mode = "Deactivation"
+                    if mode == "Creation":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "tx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
+                                        "active": get_value_if_exists_recurse(array_carrier, "active"),
+                                        "type": get_value_if_exists_recurse(array_carrier, "type"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in tx_array_carriers]
+                            }
+                        }
+                    else:
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "tx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
+                                        "active": get_value_if_exists_recurse(array_carrier, "active"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in tx_array_carriers]
+                            }
+                        }
+                    cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["tx-array-carriers"]]))
+                    number_tx_array_carriers = len(dict_to_display["User Plane Configuration"]["tx-array-carriers"])
+                    type_cell = None
+                    tags = f"cell_{cell_id}"
+                    if mode == "Creation":
+                        type_cell = ' + '.join(set([ll["type"] for ll in dict_to_display["User Plane Configuration"]["tx-array-carriers"]])) + ' '
+                    parent = analysis_box.insert('', 'end', text='', values=(
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Sends {mode} of {number_tx_array_carriers} Tx Array Carriers for {type_cell if type_cell else '' }cell {cell_id}", ""), tags=tags)
+                    json_tree(parent, dict_to_display, tags, box=analysis_box)
+    elif message_type == "notification":
+        logger.info(f"Notif message {dic}")
+        if "tx-array-carriers-state-change" in dic:
+            tx_array_carriers = get_value_if_exists_recurse(dic, "tx-array-carriers")
+            dict_to_display = {
+                "Tx Array Carrier State Change": {
+                    "tx-array-carriers": [
+                        {
+                            "name": array_carrier["name"],
+                            "state": get_value_if_exists_recurse(array_carrier, "state"),
+                            "cell_id": str(compute_cell_id(array_carrier["name"]))
+                        }
+                        for array_carrier in tx_array_carriers]
+                }
+            }
+            cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"]]))
+            tags = f"cell_{cell_id}"
+            number_tx_array_carriers = len(dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"])
+            states = ', '.join(set([ll["state"] for ll in dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"]]))
+            parent = analysis_box.insert('', 'end', text='', values=(
+                f"{message_id}", f"Cell {cell_id}", "✅", f"O-RU Notifies Tx Array Carrier State Change of {number_tx_array_carriers} Tx Array Carriers to {states} for cell {cell_id}", ""), tags=tags)
+            json_tree(parent, dict_to_display, tags, box=analysis_box)
+        if "rx-array-carriers-state-change" in dic:
+            rx_array_carriers = get_value_if_exists_recurse(dic, "rx-array-carriers")
+            dict_to_display = {
+                "Rx Array Carrier State Change": {
+                    "rx-array-carriers": [
+                        {
+                            "name": array_carrier["name"],
+                            "state": get_value_if_exists_recurse(array_carrier, "state"),
+                            "cell_id": str(compute_cell_id(array_carrier["name"]))
+                        }
+                        for array_carrier in rx_array_carriers]
+                }
+            }
+            cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"]]))
+            tags = f"cell_{cell_id}"
+            number_rx_array_carriers = len(dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"])
+            states = ', '.join(set([ll["state"] for ll in dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"]]))
+            parent = analysis_box.insert('', 'end', text='', values=(
+                f"{message_id}", f"Cell {cell_id}", "✅", f"O-RU Notifies Rx Array Carrier State Change of {number_rx_array_carriers} Rx Array Carriers to {states} for cell {cell_id}", ""), tags=tags)
+            json_tree(parent, dict_to_display, tags, box=analysis_box)
 
 
 def parse_file(full_lines):
@@ -64,6 +421,14 @@ def parse_file(full_lines):
     if "INF Listening on 0.0.0.0:830 for SSH connections." in full_lines:
         lines_filtered = [line for line in full_lines.split("\n") if ">" in line or "<" in line]
         full_lines = "\n".join(lines_filtered)
+    if "Session 0: Sending message" in full_lines:
+        logger.info("Removing unwanted bits from every line")
+        # full_lines = re.sub(r".* Session \d: Sending message:", "", full_lines)
+        full_lines = re.sub(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z Dbg: .*? Session \d+: (?:Sending|Received) message:",
+            "",
+            full_lines)
+
     reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
           r'<rpc-reply .*? message-id=.(\d+).>(.*?)</rpc-reply>|' \
           r'<notification .*?/eventTime>(.*?)</notification>|'\
@@ -71,7 +436,9 @@ def parse_file(full_lines):
 
     all_matches = re.findall(reg, full_lines, re.MULTILINE|re.DOTALL)
     hello_req = False
+
     for i,element in enumerate(all_matches):
+        message_summary = ""
         #Hello case
         if element[5] != "":
             data = element[5]
@@ -87,6 +454,8 @@ def parse_file(full_lines):
             message_type = "rpc"
             message_id = element[0]
             data = element[1]
+            if int(message_id) == 185:
+                logger.info(data)
             d = "->"
             tags = "req"
             if "get-schema" not in data:
@@ -97,7 +466,6 @@ def parse_file(full_lines):
             data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
 
         elif element[2] != "": #rpc-reply case
-
             message_type = "rpc-reply"
             message_id = element[2]
             data = element[3]
@@ -106,6 +474,7 @@ def parse_file(full_lines):
                 data = f"<rpc-error>{data}</rpc-error>"
                 tags = "rpc-error"
             else:
+                data = f"<rpc-reply>{data}</rpc-reply>"
                 tags = "resp"
             if int(message_id) in message_id_without_counterpart:
                 message_id_without_counterpart.remove(int(message_id))
@@ -126,10 +495,27 @@ def parse_file(full_lines):
         try:
             data = re.sub(r'} {', '', data, flags=re.DOTALL)
             dic = xmltodict.parse(data)
+            if tags == "req":
+                if "get" in dic:
+                    try:
+                        message_summary = f"get {''.join(dic['get']['filter'].keys())}"
+                    except:
+                        message_summary = "get"
+                elif "edit-config" in dic:
+                    try:
+                        message_summary = f"edit-config {''.join(dic['edit-config']['config'].keys())}"
+                    except:
+                        message_summary = "edit-config"
+                else:
+                    message_summary = f"rpc {''.join(dic.keys())}"
+            elif tags == "notif":
+                message_summary = f"notification {''.join(dic.keys())}"
+
         except Exception as e:
             dic = {"": f"Failed to parse data: {e}"}
+        analyze_rpc_for_oran(dic, message_type, d, message_id)
         parent = result_box.insert('', 'end', text='', values=(
-            message_id, d, message_type, "", ""), tags=tags)
+            message_id, d, message_type, f"\t\t{message_summary}", ""), tags=tags)
         json_tree(parent, dic, tags)
 
 
@@ -190,11 +576,22 @@ def get_text_box(event):
     result_box.tag_configure("resp", background='lightgreen')
     result_box.tag_configure("notif", background='#faebd7')
     result_box.tag_configure("netconf-config-change", background='#cd9575')
-    result_box.tag_configure("rpc-error", background='red')
+    result_box.tag_configure("rpc-error", background='#ff6242')
     result_box.tag_configure("no-counterpart", background='orange')
+    analysis_box.tag_configure("success", background='lightgreen')
+    analysis_box.tag_configure("failure", background='#ff6242')
+    background_cells = [
+        "#32cd32",
+        "#93dc5c",
+        "#b7e892",
+        "#dbf3c9",
+        "#c3f550"
+    ]
+    for i in range(1,300):
+        analysis_box.tag_configure(f"cell_{i}", background=background_cells[i%5])
 
 
-def load_file(event):
+def load_file_dialog(event):
     f = filedialog.askopenfile()
     text_box.insert('1.0', f.readlines())
 
@@ -205,19 +602,42 @@ def copy_to_clipboard(event):
     window.clipboard_append(full)
     window.update()
 
-def open_children(parent):
-    result_box.item(parent, open=True)
-    for child in result_box.get_children(parent):
-        open_children(child)
+def launch_oran_analysis(event):
+    back_to_tree.pack()
+    oran_analysis.pack_forget()
+    result_box.pack_forget()
+    analysis_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
+    analysis_box.config(xscrollcommand=sb2.set)
+    analysis_box.config(yscrollcommand=sb.set)
+    sb.config(command=analysis_box.yview)
+    sb2.config(command=analysis_box.xview)
 
-def handleOpenEvent(event):
-    open_children(result_box.focus())
+def back_to_tree_view(event):
+    back_to_tree.pack_forget()
+    oran_analysis.pack()
+    analysis_box.pack_forget()
+    result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
+    result_box.config(xscrollcommand=sb2.set)
+    result_box.config(yscrollcommand=sb.set)
+    sb.config(command=result_box.yview)
+    sb2.config(command=result_box.xview)
+
+
+def open_children(parent, box):
+    box.item(parent, open=True)
+    for child in box.get_children(parent):
+        open_children(child, box)
+
+def handleOpenEvent(event, box):
+    open_children(box.focus(), box)
 
 def update_title(file):
     window.title(f"NetConfParser {VERSION} - {file}")
 
 def load_file(file):
     clear_tree(None)
+    message_id_without_counterpart.clear()
+    oran_steps.clear()
     text_box.delete('1.0', tk.END)
     with open(file.data, 'r') as f:
         text_box.insert('1.0', f.readlines())
@@ -250,9 +670,9 @@ if __name__ == "__main__":
         frame_r = tk.Frame(width=100, height=200)
 
         label = tk.Label(master=frame_r, text="Paste log here")
-        text_box = tk.Text(master=frame_r)
-        sct_box = tk.Text(master=frame_r)
-        copy_sct = tk.Button(master=frame_r, text="Copy to clipboard")
+        text_box = tk.Text(master=frame_r, width=20, height=20)
+        oran_analysis = tk.Button(master=frame_r, text="See ORAN Analysis")
+        back_to_tree = tk.Button(master=frame_r, text="Back to Tree")
         filter_text = tk.Entry(master=frame_l)
         filter_button = tk.Button(master=frame_l, text="Filter")
         clear_button = tk.Button(master=frame_l, text="Clear Search")
@@ -276,7 +696,7 @@ if __name__ == "__main__":
         result_box.heading('data', text='data', anchor=tk.CENTER)
         result_box.heading('data2', text='', anchor=tk.CENTER)
 
-        result_box.bind('<<TreeviewOpen>>', handleOpenEvent)
+        result_box.bind('<<TreeviewOpen>>', lambda x: handleOpenEvent(x, result_box))
 
         sb = tk.Scrollbar(frame_l, orient=tk.VERTICAL)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
@@ -298,24 +718,50 @@ if __name__ == "__main__":
         clear_button.place(y=20, x=710, width=200)
         clear_tree_button.bind("<Button-1>", clear_tree)
         clear_tree_button.place(y=20, x=920, width=200)
-        label.place(y=10, relx=.5, anchor="center")
-        text_box.place(x=10, y=20, width=80, height=200)
+        label.pack(anchor="center")
+        text_box.pack(anchor="center", after=label)
 
         text_box.drop_target_register(DND_FILES)
         text_box.dnd_bind('<<Drop>>', load_file)
         result_box.drop_target_register(DND_FILES)
         result_box.dnd_bind('<<Drop>>', load_file)
 
-        result_box.place(y=50, relwidth=1.0, relheight=0.95)
+        result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
+
+        analysis_box = ttk.Treeview(master=frame_l)
+        analysis_box["columns"] = ("msg-id", "category", "status", "information", "data2")
+        analysis_box.column("#0", width=50, minwidth=10, stretch=tk.NO)
+        analysis_box.column("msg-id", width=50, minwidth=20,
+                          stretch=tk.NO, anchor="c")
+        analysis_box.column("category", width=100, minwidth=100,
+                          stretch=tk.NO, anchor="c")
+        analysis_box.column("status", width=50, minwidth=100,
+                          stretch=tk.NO, anchor="c")
+        analysis_box.column("information", width=400, minwidth=400)
+        analysis_box.column("data2", width=200, minwidth=200)
+        analysis_box.heading('#0', text='', anchor=tk.CENTER)
+        analysis_box.heading('msg-id', text='msg-id', anchor=tk.CENTER)
+        analysis_box.heading('category', text='category', anchor=tk.CENTER)
+        analysis_box.heading('status', text='status', anchor=tk.CENTER)
+        analysis_box.heading('information', text='information', anchor=tk.CENTER)
+        analysis_box.heading('data2', text='', anchor=tk.CENTER)
+
+        analysis_box.bind('<<TreeviewOpen>>', lambda x: handleOpenEvent(x, analysis_box))
+        analysis_box.pack_forget()
+
         parse_button.bind("<Button-1>", get_text_box)
-        parse_button.place(y=240, relx=.5, anchor="center")
-        load_button.bind("<Button-1>", load_file)
-        load_button.place(y=280, relx=.5, anchor="center")
-        sct_box.place(x=10, y=300, width=80, height=200)
-        copy_sct.place(y=560, relx=.5, anchor="center")
-        copy_sct.bind("<Button-1>", copy_to_clipboard)
+        parse_button.pack(anchor="center", after=text_box)
+        load_button.bind("<Button-1>", load_file_dialog)
+        load_button.pack(anchor="center", after=parse_button)
+
+        oran_analysis.pack(anchor="center", after=load_button)
+        #back_to_tree.place(y=560, relx=.5, anchor="center")
+        back_to_tree.pack_forget()
+        back_to_tree.bind("<Button-1>", back_to_tree_view)
+        oran_analysis.bind("<Button-1>", launch_oran_analysis)
 
         frame_l.pack(fill=tk.BOTH, side=tk.LEFT, expand=True)
+        frame_r.grid_propagate(False)
         frame_r.pack(fill=tk.Y, side=tk.RIGHT)
         window.mainloop()
     except Exception as e:
