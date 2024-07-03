@@ -100,21 +100,16 @@ def compute_cell_id(dn):
 
 def analyze_rpc_for_oran(dic, message_type, d, message_id):
     global oran_steps
-    logger.info(f"Analyzing RPC for ORAN: {message_id}")
     tags = "success"
     if message_type == "hello" and d == '<-':
         analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "✅", "Netconf Client Connected"), tags= "success")
-        logger.info("Netconf Client Connected")
     elif message_type == "rpc-reply":
         if "rpc-error" in dic:
             analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "❎", f"RPC Error for message-id {message_id}"), tags="failure")
-            logger.error(f"RPC Error for message-id {message_id}")
 
         elif get_value_if_exists_recurse(dic, "supported-mplane-version") is not None:
             analysis_box.insert("", "end", text="", values=(f"{message_id}", "RU", "✅", f"Supported MPLANE version: {get_value_if_exists_recurse(dic, 'supported-mplane-version')}"), tags=tags)
-            logger.info(f"Supported MPLANE version: {get_value_if_exists_recurse(dic, 'supported-mplane-version')}")
         elif check_value_if_exists_recurse(dic, "o-ran-hw:O-RAN-RADIO"):
-            logger.info("Detected O-RAN-RADIO Hardware")
             mfg_name = get_value_if_exists_recurse(dic, "mfg-name")
             product_code = get_value_if_exists_recurse(dic, "product-code")
             serial_num = get_value_if_exists_recurse(dic, "serial-num")
@@ -188,11 +183,8 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                 json_tree(parent, dict_to_display, tags, box=analysis_box)
 
     elif message_type == "rpc":
-        logger.info(f"RPC Message {dic}")
         if "edit-config" in dic:
-            logger.info("Edit Config RPC")
             if get_value_if_exists_recurse(dic, "user-plane-configuration") is not None:
-                logger.info("User Plane Configuration")
                 low_level_rx_endpoints = get_all_values_for_key_recurse(dic, "low-level-rx-endpoints", [])
                 low_level_tx_endpoints = get_all_values_for_key_recurse(dic, "low-level-tx-endpoints", [])
                 rx_array_carriers = get_all_values_for_key_recurse(dic, "rx-array-carriers", [])
@@ -276,7 +268,6 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                             for tx_link in low_level_tx_links]
                         }
                     }
-                    logger.info(f"Low Level Tx Links: {dict_to_display}")
                     cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-tx-links"]]))
                     tags = f"cell_{cell_id}"
                     number_low_level_tx_links = len(dict_to_display["User Plane Configuration"]["low-level-tx-links"])
@@ -372,7 +363,6 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Sends {mode} of {number_tx_array_carriers} Tx Array Carriers for {type_cell if type_cell else '' }cell {cell_id}", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
     elif message_type == "notification":
-        logger.info(f"Notif message {dic}")
         if "tx-array-carriers-state-change" in dic:
             tx_array_carriers = get_value_if_exists_recurse(dic, "tx-array-carriers")
             dict_to_display = {
@@ -422,7 +412,6 @@ def parse_file(full_lines):
         lines_filtered = [line for line in full_lines.split("\n") if ">" in line or "<" in line]
         full_lines = "\n".join(lines_filtered)
     if "Session 0: Sending message" in full_lines:
-        logger.info("Removing unwanted bits from every line")
         # full_lines = re.sub(r".* Session \d: Sending message:", "", full_lines)
         full_lines = re.sub(
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z Dbg: .*? Session \d+: (?:Sending|Received) message:",
@@ -454,8 +443,6 @@ def parse_file(full_lines):
             message_type = "rpc"
             message_id = element[0]
             data = element[1]
-            if int(message_id) == 185:
-                logger.info(data)
             d = "->"
             tags = "req"
             if "get-schema" not in data:
@@ -562,6 +549,7 @@ def clear_tree(event):
 
 def get_text_box(event):
     result_box.delete(*result_box.get_children())
+    analysis_box.delete(*analysis_box.get_children())
     full = text_box.get("1.0", tk.END)
     text_box.delete("1.0", tk.END)
     parse_file(full)
