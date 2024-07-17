@@ -22,7 +22,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.4"
+VERSION = "v0.5"
 
 
 def wrap(string, length=100):
@@ -523,6 +523,18 @@ def parse_file(full_lines):
     hello_req = False
 
     for i,element in enumerate(all_matches):
+        pb['value'] = int(i/len(all_matches)*100)
+
+        if pb['value'] < 25:
+            label_step['text'] = "... Starting ..."
+        elif pb['value'] < 50:
+            label_step['text'] = "... Not Giving Up ..."
+        elif pb['value'] < 75:
+            label_step['text'] = "... Running Full Speed ..."
+        else:
+            label_step['text'] = "... Almost There ..."
+
+        label_pb['text'] = f"{pb['value']}%"
         message_summary = ""
         #Hello case
         if element[5] != "":
@@ -658,6 +670,17 @@ def get_text_box(event):
     analysis_box.delete(*analysis_box.get_children())
     full = text_box.get("1.0", tk.END)
     text_box.delete("1.0", tk.END)
+    import threading
+    t1 = threading.Thread(target=threaded_operation, args=(full,))
+    t1.start()
+
+def monitor(thread):
+    if thread.is_alive():
+        window.after(100, lambda: monitor(thread))
+
+
+def threaded_operation(full):
+    result_box.pack_forget()
     parse_file(full)
     # Apply no counterparts tag
     for child in result_box.get_children():
@@ -683,7 +706,10 @@ def get_text_box(event):
     ]
     for i in range(1,300):
         analysis_box.tag_configure(f"cell_{i}", background=background_cells[i%5])
-
+    result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
+    pb.pack_forget()
+    label_pb.pack_forget()
+    label_step.pack_forget()
 
 def load_file_dialog(event):
     f = filedialog.askopenfile()
@@ -733,6 +759,10 @@ def load_file(file):
     message_id_without_counterpart.clear()
     oran_steps.clear()
     text_box.delete('1.0', tk.END)
+    pb.pack(pady=60)
+
+    label_pb.pack()
+    label_step.pack()
     with open(file.data, 'r') as f:
         text_box.insert('1.0', f.readlines())
     get_text_box(None)
@@ -822,6 +852,13 @@ if __name__ == "__main__":
         result_box.dnd_bind('<<Drop>>', load_file)
 
         result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
+        pb = ttk.Progressbar(frame_r, orient='vertical', mode='determinate', length=280)
+        pb.pack_forget()
+        label_step = ttk.Label(frame_r, text="... Starting ...")
+        label_step.pack_forget()
+        label_pb = ttk.Label(frame_r, text="0%")
+        label_pb.pack_forget()
+
 
         analysis_box = ttk.Treeview(master=frame_l)
         analysis_box["columns"] = ("msg-id", "category", "status", "information", "data2")
