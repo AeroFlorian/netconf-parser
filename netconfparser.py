@@ -204,39 +204,77 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         return "DATA"
 
                 if low_level_rx_endpoints:
-                    dict_to_display = {
-                        "User Plane Configuration": {
-                            "low-level-rx-endpoints": [
-                                {
-                                    "name": rx_endpoint["name"],
-                                    "eaxc-id": get_value_if_exists_recurse(rx_endpoint, "eaxc-id"),
-                                    "type": get_type_from_endpoint(get_value_if_exists_recurse(rx_endpoint, "scs"), "ul")
-                                }
-                            for rx_endpoint in low_level_rx_endpoints[0]]
+                    if get_value_if_exists_recurse(low_level_rx_endpoints[0][0], "eaxc-id") is None:
+                        mode = "Deletion"
+                    else:
+                        mode = "Creation"
+                    if mode == "Creation":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-rx-endpoints": [
+                                    {
+                                        "name": rx_endpoint["name"],
+                                        "eaxc-id": get_value_if_exists_recurse(rx_endpoint, "eaxc-id"),
+                                        "type": get_type_from_endpoint(get_value_if_exists_recurse(rx_endpoint, "scs"), "ul")
+                                    }
+                                for rx_endpoint in low_level_rx_endpoints[0]]
+                            }
                         }
-                    }
+                    else:
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-rx-endpoints": [
+                                    {
+                                        "name": rx_endpoint["name"]
+                                    }
+                                    for rx_endpoint in low_level_rx_endpoints[0]]
+                            }
+                        }
+                    operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", "Cell", "✅", f"O-DU Creates Low Level Rx-Endpoints", ""), tags=tags)
+                        f"{message_id}", "Cell", "✅", f"O-DU {operation} Low Level Rx-Endpoints", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if low_level_tx_endpoints:
-                    dict_to_display = {
-                        "User Plane Configuration": {
-                            "low-level-tx-endpoints": [
-                                {
-                                    "name": tx_endpoint["name"],
-                                    "eaxc-id": get_value_if_exists_recurse(tx_endpoint, "eaxc-id"),
-                                    "type": get_type_from_endpoint(get_value_if_exists_recurse(tx_endpoint, "scs"), "dl")
-                                }
-                            for tx_endpoint in low_level_tx_endpoints[0]]
+                    if get_value_if_exists_recurse(low_level_tx_endpoints[0][0], "eaxc-id") is None:
+                        mode = "Deletion"
+                    else:
+                        mode = "Creation"
+                    if mode == "Creation":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-tx-endpoints": [
+                                    {
+                                        "name": tx_endpoint["name"],
+                                        "eaxc-id": get_value_if_exists_recurse(tx_endpoint, "eaxc-id"),
+                                        "type": get_type_from_endpoint(get_value_if_exists_recurse(tx_endpoint, "scs"), "dl")
+                                    }
+                                for tx_endpoint in low_level_tx_endpoints[0]]
+                            }
                         }
-                    }
+                    else:
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-tx-endpoints": [
+                                    {
+                                        "name": tx_endpoint["name"]
+                                    }
+                                    for tx_endpoint in low_level_tx_endpoints[0]]
+                            }
+                        }
+
+                    operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", "Cell", "✅", f"O-DU Creates Low Level Tx-Endpoints", ""), tags=tags)
+                        f"{message_id}", "Cell", "✅", f"O-DU {operation} Low Level Tx-Endpoints", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if low_level_rx_links:
                     if type(low_level_rx_links[0]) is list:
                         low_level_rx_links = low_level_rx_links[0]
-                    dict_to_display = {
+                    if "rx-array-carrier" not in low_level_rx_links[0]:
+                        mode = "Deletion"
+                    else:
+                        mode = "Creation"
+                    if mode == "Creation":
+                        dict_to_display = {
                         "User Plane Configuration": {
                             "low-level-rx-links": [
                                 {
@@ -248,32 +286,62 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                             for rx_link in low_level_rx_links]
                         }
                     }
+                    else:
+                        dict_to_display = {
+                        "User Plane Configuration": {
+                            "low-level-rx-links": [
+                                {
+                                    "name": rx_link["name"],
+                                    "cell_id": str(compute_cell_id(rx_link["name"]))
+                                }
+                                for rx_link in low_level_rx_links]
+                        }
+                    }
                     cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-rx-links"]]))
                     tags = f"cell_{cell_id}"
                     number_low_level_rx_links = len(dict_to_display["User Plane Configuration"]["low-level-rx-links"])
+                    operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Creates {number_low_level_rx_links} Low Level Rx Links for cell {cell_id}", ""), tags=tags)
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU {operation} {number_low_level_rx_links} Low Level Rx Links for cell {cell_id}", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if low_level_tx_links:
                     if type(low_level_tx_links[0]) is list:
                         low_level_tx_links = low_level_tx_links[0]
-                    dict_to_display = {
-                        "User Plane Configuration": {
-                            "low-level-tx-links": [
-                                {
-                                    "name": tx_link["name"],
-                                    "tx-array-carrier": tx_link["tx-array-carrier"],
-                                    "low-level-tx-endpoint": tx_link["low-level-tx-endpoint"],
-                                    "cell_id": str(compute_cell_id(tx_link["name"]))
-                                }
-                            for tx_link in low_level_tx_links]
+                    if "tx-array-carrier" not in low_level_tx_links[0]:
+                        mode = "Deletion"
+                    else:
+                        mode = "Creation"
+
+                    if mode == "Creation":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-tx-links": [
+                                    {
+                                        "name": tx_link["name"],
+                                        "tx-array-carrier": tx_link["tx-array-carrier"],
+                                        "low-level-tx-endpoint": tx_link["low-level-tx-endpoint"],
+                                        "cell_id": str(compute_cell_id(tx_link["name"]))
+                                    }
+                                for tx_link in low_level_tx_links]
+                            }
                         }
-                    }
+                    else:
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "low-level-tx-links": [
+                                    {
+                                        "name": tx_link["name"],
+                                        "cell_id": str(compute_cell_id(tx_link["name"]))
+                                    }
+                                    for tx_link in low_level_tx_links]
+                            }
+                        }
                     cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-tx-links"]]))
                     tags = f"cell_{cell_id}"
                     number_low_level_tx_links = len(dict_to_display["User Plane Configuration"]["low-level-tx-links"])
+                    operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU Creates {number_low_level_tx_links} Low Level Tx Links for cell {cell_id}", ""), tags=tags)
+                        f"{message_id}", f"Cell {cell_id}", "✅", f"O-DU {operation} {number_low_level_tx_links} Low Level Tx Links for cell {cell_id}", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if rx_array_carriers:
                     if type(rx_array_carriers[0]) is list:
@@ -281,10 +349,12 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
 
                     if get_value_if_exists_recurse(rx_array_carriers[0], "active") == "ACTIVE":
                         mode = "Activation"
-                    elif get_value_if_exists_recurse(rx_array_carriers[0], "type") is not None:
+                    elif get_value_if_exists_recurse(rx_array_carriers[0], "type") is not None or get_value_if_exists_recurse(rx_array_carriers[0], "channel-bandwidth") is not None:
                         mode = "Creation"
-                    else:
+                    elif get_value_if_exists_recurse(rx_array_carriers[0], "active") == "INACTIVE":
                         mode = "Deactivation"
+                    else:
+                        mode = "Deletion"
                     if mode == "Creation":
                         dict_to_display = {
                             "User Plane Configuration": {
@@ -292,7 +362,18 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                                     {
                                         "name": array_carrier["name"],
                                         "active": get_value_if_exists_recurse(array_carrier, "active"),
-                                        "type": get_value_if_exists_recurse(array_carrier, "type"),
+                                        "type": "N/A" if get_value_if_exists_recurse(array_carrier, "type") is None else get_value_if_exists_recurse(array_carrier, "type"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in rx_array_carriers]
+                            }
+                        }
+                    elif mode == "Deletion":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "rx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
                                         "cell_id": str(compute_cell_id(array_carrier["name"]))
                                     }
                                     for array_carrier in rx_array_carriers]
@@ -325,18 +406,32 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
 
                     if get_value_if_exists_recurse(tx_array_carriers[0], "active") == "ACTIVE":
                         mode = "Activation"
-                    elif get_value_if_exists_recurse(tx_array_carriers[0], "type") is not None:
+                    elif get_value_if_exists_recurse(tx_array_carriers[0], "type") is not None or get_value_if_exists_recurse(tx_array_carriers[0], "channel-bandwidth") is not None:
                         mode = "Creation"
-                    else:
+                    elif get_value_if_exists_recurse(tx_array_carriers[0], "active") == "INACTIVE":
                         mode = "Deactivation"
+                    else:
+                        mode = "Deletion"
                     if mode == "Creation":
+
                         dict_to_display = {
                             "User Plane Configuration": {
                                 "tx-array-carriers": [
                                     {
                                         "name": array_carrier["name"],
                                         "active": get_value_if_exists_recurse(array_carrier, "active"),
-                                        "type": get_value_if_exists_recurse(array_carrier, "type"),
+                                        "type": "N/A" if get_value_if_exists_recurse(array_carrier, "type") is None else get_value_if_exists_recurse(array_carrier, "type"),
+                                        "cell_id": str(compute_cell_id(array_carrier["name"]))
+                                    }
+                                    for array_carrier in tx_array_carriers]
+                            }
+                        }
+                    elif mode == "Deletion":
+                        dict_to_display = {
+                            "User Plane Configuration": {
+                                "tx-array-carriers": [
+                                    {
+                                        "name": array_carrier["name"],
                                         "cell_id": str(compute_cell_id(array_carrier["name"]))
                                     }
                                     for array_carrier in tx_array_carriers]
