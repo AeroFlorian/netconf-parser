@@ -22,7 +22,8 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.5"
+VERSION = "v0.6"
+cells_found=set()
 
 
 def wrap(string, length=100):
@@ -130,6 +131,8 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
             json_tree(parent, dict_to_display, tags, box=analysis_box)
         elif get_value_if_exists_recurse(dic, "module-capability") is not None:
             bands = get_all_values_for_key_recurse(dic, "band-capabilities", []) #band-capabilities is already a list
+            if len(bands) > 0 and type(bands[0]) is not list:
+                bands = [bands]
             if bands:
                 dict_to_display = {
                     "Bands Supported": [
@@ -299,6 +302,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                     }
                     cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-rx-links"]]))
                     tags = f"cell_{cell_id}"
+                    cells_found.add(cell_id)
                     number_low_level_rx_links = len(dict_to_display["User Plane Configuration"]["low-level-rx-links"])
                     operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
@@ -338,6 +342,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         }
                     cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["User Plane Configuration"]["low-level-tx-links"]]))
                     tags = f"cell_{cell_id}"
+                    cells_found.add(cell_id)
                     number_low_level_tx_links = len(dict_to_display["User Plane Configuration"]["low-level-tx-links"])
                     operation = "Creates" if mode == "Creation" else "Deletes"
                     parent = analysis_box.insert('', 'end', text='', values=(
@@ -395,6 +400,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                     number_rx_array_carriers = len(dict_to_display["User Plane Configuration"]["rx-array-carriers"])
                     type_cell = None
                     tags = f"cell_{cell_id}"
+                    cells_found.add(cell_id)
                     if mode == "Creation":
                         type_cell = ' + '.join(set([ll["type"] for ll in dict_to_display["User Plane Configuration"]["rx-array-carriers"]])) + ' '
                     parent = analysis_box.insert('', 'end', text='', values=(
@@ -453,6 +459,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                     number_tx_array_carriers = len(dict_to_display["User Plane Configuration"]["tx-array-carriers"])
                     type_cell = None
                     tags = f"cell_{cell_id}"
+                    cells_found.add(cell_id)
                     if mode == "Creation":
                         type_cell = ' + '.join(set([ll["type"] for ll in dict_to_display["User Plane Configuration"]["tx-array-carriers"]])) + ' '
                     parent = analysis_box.insert('', 'end', text='', values=(
@@ -461,6 +468,8 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
     elif message_type == "notification":
         if "tx-array-carriers-state-change" in dic:
             tx_array_carriers = get_value_if_exists_recurse(dic, "tx-array-carriers")
+            if type(tx_array_carriers) is dict:
+                tx_array_carriers = [tx_array_carriers]
             dict_to_display = {
                 "Tx Array Carrier State Change": {
                     "tx-array-carriers": [
@@ -474,6 +483,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
             }
             cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"]]))
             tags = f"cell_{cell_id}"
+            cells_found.add(cell_id)
             number_tx_array_carriers = len(dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"])
             states = ', '.join(set([ll["state"] for ll in dict_to_display["Tx Array Carrier State Change"]["tx-array-carriers"]]))
             parent = analysis_box.insert('', 'end', text='', values=(
@@ -481,6 +491,8 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
             json_tree(parent, dict_to_display, tags, box=analysis_box)
         if "rx-array-carriers-state-change" in dic:
             rx_array_carriers = get_value_if_exists_recurse(dic, "rx-array-carriers")
+            if type(rx_array_carriers) is dict:
+                rx_array_carriers = [rx_array_carriers]
             dict_to_display = {
                 "Rx Array Carrier State Change": {
                     "rx-array-carriers": [
@@ -494,6 +506,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
             }
             cell_id = ', '.join(set([ll["cell_id"] for ll in dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"]]))
             tags = f"cell_{cell_id}"
+            cells_found.add(cell_id)
             number_rx_array_carriers = len(dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"])
             states = ', '.join(set([ll["state"] for ll in dict_to_display["Rx Array Carrier State Change"]["rx-array-carriers"]]))
             parent = analysis_box.insert('', 'end', text='', values=(
@@ -704,8 +717,8 @@ def threaded_operation(full):
         "#dbf3c9",
         "#c3f550"
     ]
-    for i in range(1,300):
-        analysis_box.tag_configure(f"cell_{i}", background=background_cells[i%5])
+    for index, i in enumerate(cells_found):
+        analysis_box.tag_configure(f"cell_{i}", background=background_cells[index%5])
     result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
     pb.pack_forget()
     label_pb.pack_forget()
@@ -772,7 +785,10 @@ def load_file(file):
 if __name__ == "__main__":
 
     try:
-        uu.decode('fs_ico_encoded', 'fs.ico')
+        try:
+            uu.decode('fs_ico_encoded', 'fs.ico')
+        except:
+            pass
         window = TkinterDnD.Tk()
         s = ttk.Style()
         #window = ttk.Window(themename="solar")
@@ -788,8 +804,11 @@ if __name__ == "__main__":
               background=fixed_map('background'))
         # end workaround
         window.title(f'NetConfParser {VERSION}')
-        window.wm_iconbitmap('fs.ico')
-        window.iconbitmap('fs.ico')
+        try:
+            window.wm_iconbitmap('fs.ico')
+            window.iconbitmap('fs.ico')
+        except:
+            pass
         window.state('zoomed')
         frame_l = tk.Frame(width=200, height=400)
         frame_r = tk.Frame(width=100, height=200)
