@@ -91,6 +91,8 @@ def check_value_if_exists_recurse(dic, value):
 
 
 def display_list_tech(l):
+    if type(l) is not list:
+        l = [l]
     return " + ".join([str(x) for x in l])
 
 
