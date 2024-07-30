@@ -12,6 +12,7 @@ import xmltodict
 import uuid
 import textwrap
 import uu
+from collections import defaultdict
 
 text_box = None
 result_box = None
@@ -22,7 +23,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.6"
+VERSION = "v0.7"
 cells_found=set()
 
 
@@ -234,8 +235,17 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                             }
                         }
                     operation = "Creates" if mode == "Creation" else "Deletes"
+                    if mode == "Creation":
+                        types_d = defaultdict(lambda : 0)
+                        for endpoint in dict_to_display["User Plane Configuration"]["low-level-rx-endpoints"]:
+                            types_d[endpoint["type"]] += 1
+                        types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
+                    else:
+                        types = ""
+                    number_of_endpoints = len(dict_to_display["User Plane Configuration"]["low-level-rx-endpoints"])
+
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", "Cell", "✅", f"O-DU {operation} Low Level Rx-Endpoints", ""), tags=tags)
+                        f"{message_id}", "Cell", "✅", f"O-DU {operation} {number_of_endpoints} Low Level Rx-Endpoints {types}", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if low_level_tx_endpoints:
                     if get_value_if_exists_recurse(low_level_tx_endpoints[0][0], "eaxc-id") is None:
@@ -266,8 +276,18 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         }
 
                     operation = "Creates" if mode == "Creation" else "Deletes"
+                    if mode == "Creation":
+                        types_d = defaultdict(lambda : 0)
+                        for endpoint in dict_to_display["User Plane Configuration"]["low-level-tx-endpoints"]:
+                            types_d[endpoint["type"]] += 1
+                        types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
+                    else:
+                        types = ""
+
+                    number_of_endpoints = len(dict_to_display["User Plane Configuration"]["low-level-tx-endpoints"])
+
                     parent = analysis_box.insert('', 'end', text='', values=(
-                        f"{message_id}", "Cell", "✅", f"O-DU {operation} Low Level Tx-Endpoints", ""), tags=tags)
+                        f"{message_id}", "Cell", "✅", f"O-DU {operation} {number_of_endpoints} Low Level Tx-Endpoints {types}", ""), tags=tags)
                     json_tree(parent, dict_to_display, tags, box=analysis_box)
                 if low_level_rx_links:
                     if type(low_level_rx_links[0]) is list:
@@ -358,6 +378,10 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         mode = "Creation"
                     elif get_value_if_exists_recurse(rx_array_carriers[0], "active") == "INACTIVE":
                         mode = "Deactivation"
+                    elif get_value_if_exists_recurse(rx_array_carriers[0], "n-ta-offset") is not None:
+                        mode = "Update"
+                        #no need to display this one
+                        return
                     else:
                         mode = "Deletion"
                     if mode == "Creation":
@@ -416,6 +440,10 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
                         mode = "Creation"
                     elif get_value_if_exists_recurse(tx_array_carriers[0], "active") == "INACTIVE":
                         mode = "Deactivation"
+                    elif get_value_if_exists_recurse(tx_array_carriers[0], "gain") is not None:
+                        mode = "Update"
+                        #no need to display this one
+                        return
                     else:
                         mode = "Deletion"
                     if mode == "Creation":
@@ -572,6 +600,7 @@ def parse_file(full_lines):
                 message_type = "get-schema"
                 tags = "schema"
             data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
+            data = re.sub('\n', '', data)
 
         elif element[2] != "": #rpc-reply case
             message_type = "rpc-reply"
@@ -631,7 +660,10 @@ def parse_file(full_lines):
                 message_summary = f"get-schema {dic['get-schema']['identifier']}"
         except Exception as e:
             dic = {"": f"Failed to parse data: {e}"}
-        analyze_rpc_for_oran(dic, message_type, d, message_id)
+        try:
+            analyze_rpc_for_oran(dic, message_type, d, message_id)
+        except Exception as e:
+            print(e)
         parent = result_box.insert('', 'end', text='', values=(
             message_id, d, message_type, f"\t\t{message_summary}", ""), tags=tags)
         json_tree(parent, dic, tags)
