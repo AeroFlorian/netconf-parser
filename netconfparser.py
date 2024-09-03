@@ -715,6 +715,7 @@ def clear_tree(event):
 def get_text_box(event):
     result_box.delete(*result_box.get_children())
     analysis_box.delete(*analysis_box.get_children())
+    back_to_tree_view(None)
     full = text_box.get("1.0", tk.END)
     text_box.delete("1.0", tk.END)
     import threading
