@@ -91,6 +91,8 @@ def check_value_if_exists_recurse(dic, value):
 
 
 def display_list_tech(l):
+    if type(l) is not list:
+        l = [l]
     return " + ".join([str(x) for x in l])
 
 
@@ -713,6 +715,7 @@ def clear_tree(event):
 def get_text_box(event):
     result_box.delete(*result_box.get_children())
     analysis_box.delete(*analysis_box.get_children())
+    back_to_tree_view(None)
     full = text_box.get("1.0", tk.END)
     text_box.delete("1.0", tk.END)
     import threading
