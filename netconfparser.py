@@ -23,7 +23,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.7"
+VERSION = "v0.8"
 cells_found=set()
 
 
@@ -547,7 +547,7 @@ def analyze_rpc_for_oran(dic, message_type, d, message_id):
 def parse_file(full_lines):
     global message_id_without_counterpart
     #Check if there is the log file will contain unwanted lines between messages
-    if "INF Listening on 0.0.0.0:830 for SSH connections." in full_lines:
+    if "830 for SSH connections" in full_lines:
         lines_filtered = [line for line in full_lines.split("\n") if ">" in line or "<" in line]
         full_lines = "\n".join(lines_filtered)
     if "Session 0: Sending message" in full_lines:
@@ -609,7 +609,8 @@ def parse_file(full_lines):
             message_id = element[2]
             data = element[3]
             d = "<-"
-            if "rpc-error" in data:
+
+            if "rpc-error" in data and "out-rpc-error" not in data:
                 data = f"<rpc-error>{data}</rpc-error>"
                 tags = "rpc-error"
             else:

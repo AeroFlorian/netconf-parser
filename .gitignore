@@ -1,2 +1,4 @@
 *.pyc
 NetConfParser.log
+dist/
+build/
