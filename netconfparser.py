@@ -26,6 +26,7 @@ message_id_without_counterpart = []
 oran_steps = []
 VERSION = "v0.9"
 cells_found=set()
+ENORMOUS_RPC_SIZE = 20000
 
 
 def wrap(string, length=100):
@@ -680,9 +681,11 @@ def parse_file(full_lines):
             analyze_rpc_for_oran(dic, message_type, d, message_id)
         except Exception as e:
             print(e)
+        if len(data) >= ENORMOUS_RPC_SIZE and not parse_enormous_rpc.get():
+            message_summary = message_summary + " (RPC too big check Parse Enormous RPCs and parse again to display the tree)"
         parent = result_box.insert('', 'end', text='', values=(
             message_id, d, message_type, f"\t\t{message_summary}", "", xml), tags=tags)
-        if len(data) < 20000 or parse_enormous_rpc.get():
+        if len(data) < ENORMOUS_RPC_SIZE or parse_enormous_rpc.get():
             json_tree(parent, dic, tags, xml=xml)
 
 
