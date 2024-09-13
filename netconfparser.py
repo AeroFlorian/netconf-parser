@@ -13,6 +13,7 @@ import uuid
 import textwrap
 import uu
 from collections import defaultdict
+import xml.dom.minidom
 
 text_box = None
 result_box = None
@@ -23,7 +24,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.8"
+VERSION = "v0.9"
 cells_found=set()
 
 
@@ -31,18 +32,18 @@ def wrap(string, length=100):
     return '\n'.join(textwrap.wrap(string, length))
 
 
-def json_tree(parent, dictionary, tags, depth=0, box=None):
+def json_tree(parent, dictionary, tags, depth=0, box=None, xml=""):
     if box is None:
         box = result_box
     for key in dictionary:
         uid = uuid.uuid4()
         if isinstance(dictionary[key], dict):
             box.insert(parent, 'end', uid, text='', values=(
-                "", "", "", "\t" * depth + key, ""), tags=tags)
-            json_tree(uid, dictionary[key], tags, depth + 1, box=box)
+                "", "", "", "\t" * depth + key, "", xml), tags=tags)
+            json_tree(uid, dictionary[key], tags, depth + 1, box=box, xml=xml)
         elif isinstance(dictionary[key], list):
             json_tree(parent,
-                      dict([(key + (" " * i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1, box=box)
+                      dict([(key + (" " * i), x) for i, x in enumerate(dictionary[key])]), tags, depth + 1, box=box, xml=xml)
         else:
             value = dictionary[key]
             key_without_ns = key.split(':')[-1]
@@ -58,10 +59,10 @@ def json_tree(parent, dictionary, tags, depth=0, box=None):
                 for i, v in enumerate(vl):
                     uid = uuid.uuid4()
                     box.insert(parent, 'end', uid, text='', values=(
-                        "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v)), tags=tags)
+                        "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v), xml), tags=tags)
             else:
                 box.insert(parent, 'end', uid, text='', values=(
-                "", "", "", "\t" * depth + str(key_without_ns), wrap(value)), tags=tags)
+                "", "", "", "\t" * depth + str(key_without_ns), wrap(value), xml), tags=tags)
 
 def get_value_if_exists_recurse(dic, key):
     for (k,v) in dic.items():
@@ -556,6 +557,11 @@ def parse_file(full_lines):
             r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z Dbg: .*? Session \d+: (?:Sending|Received) message:",
             "",
             full_lines)
+    else:
+        full_lines = re.sub(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7} INF (?:Sending|Received) message: ",
+            "",
+            full_lines)
 
     reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
           r'<rpc-reply .*? message-id=.(\d+).>(.*?)</rpc-reply>|' \
@@ -584,6 +590,7 @@ def parse_file(full_lines):
             data = element[5]
             message_type = "hello"
             message_id = "0"
+            raw_data = f'<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{element[5]}</hello>'
             data = element[5]
             d = "->" if not hello_req else "<-"
             tags = "hello"
@@ -593,6 +600,7 @@ def parse_file(full_lines):
         elif element[0] != "": #rpc case
             message_type = "rpc"
             message_id = element[0]
+            raw_data = f'<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{element[1]}</rpc>'
             data = element[1]
             d = "->"
             tags = "req"
@@ -608,9 +616,9 @@ def parse_file(full_lines):
             message_type = "rpc-reply"
             message_id = element[2]
             data = element[3]
+            raw_data = f'<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{element[3]}</rpc-reply>'
             d = "<-"
-
-            if "rpc-error" in data and "out-rpc-error" not in data:
+            if len(data) < 10000 and "rpc-error" in data:
                 data = f"<rpc-error>{data}</rpc-error>"
                 tags = "rpc-error"
             else:
@@ -625,6 +633,7 @@ def parse_file(full_lines):
             message_type = "notification"
             message_id = "N/A"
             data = element[4]
+            raw_data = f'<notification xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{element[4]}</notification>'
             d = "<-"
             if "netconf-config-change" in data:
                 tags = "config-change"
@@ -633,7 +642,11 @@ def parse_file(full_lines):
             data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
 
         try:
+            raw_data = re.sub(r'} {', '', raw_data, flags=re.DOTALL)
+            raw_data = re.sub(r'\n', '', raw_data, flags=re.DOTALL)
             data = re.sub(r'} {', '', data, flags=re.DOTALL)
+            data = re.sub(r'\n', '', data, flags=re.DOTALL)
+            xml = raw_data
             dic = xmltodict.parse(data)
             if tags == "req":
                 if "get" in dic:
@@ -668,8 +681,9 @@ def parse_file(full_lines):
         except Exception as e:
             print(e)
         parent = result_box.insert('', 'end', text='', values=(
-            message_id, d, message_type, f"\t\t{message_summary}", ""), tags=tags)
-        json_tree(parent, dic, tags)
+            message_id, d, message_type, f"\t\t{message_summary}", "", xml), tags=tags)
+        if len(data) < 20000 or parse_enormous_rpc.get():
+            json_tree(parent, dic, tags, xml=xml)
 
 
 def search_in_element(query, element):
@@ -767,7 +781,7 @@ def load_file_dialog(event):
 
 def copy_to_clipboard(event):
     window.clipboard_clear()
-    full = sct_box.get("1.0", tk.END)
+    full = message_text_box.get("1.0", tk.END)
     window.clipboard_append(full)
     window.update()
 
@@ -800,6 +814,7 @@ def open_children(parent, box):
 def handleOpenEvent(event, box):
     open_children(box.focus(), box)
 
+
 def update_title(file):
     window.title(f"NetConfParser {VERSION} - {file}")
 
@@ -816,6 +831,16 @@ def load_file(file):
         text_box.insert('1.0', f.readlines())
     get_text_box(None)
     update_title(file.data)
+
+def show_message_in_text(event):
+    itemid = result_box.identify('item', event.x, event.y)
+    x = result_box.item(itemid)
+    xml_str = x['values'][-1]
+    st = xml.dom.minidom.parseString(xml_str)
+    pps = st.toprettyxml(indent='    ')
+    pps = re.sub(r'<.xml version="1.0" .>\n', "", pps)
+    message_text_box.delete('1.0', tk.END)
+    message_text_box.insert('1.0', pps)
 
 
 if __name__ == "__main__":
@@ -853,13 +878,16 @@ if __name__ == "__main__":
         text_box = tk.Text(master=frame_r, width=20, height=20)
         oran_analysis = tk.Button(master=frame_r, text="See ORAN Analysis")
         back_to_tree = tk.Button(master=frame_r, text="Back to Tree")
+        parse_enormous_rpc = tk.IntVar()
+        parse_snapshot = tk.Checkbutton(master=frame_r, text='Parse Enormous RPCs', variable=parse_enormous_rpc, onvalue=1, offvalue=0)
         filter_text = tk.Entry(master=frame_l)
         filter_button = tk.Button(master=frame_l, text="Filter")
         clear_button = tk.Button(master=frame_l, text="Clear Search")
         clear_tree_button = tk.Button(master=frame_l, text="Clear Tree")
 
         result_box = ttk.Treeview(master=frame_l)
-        result_box["columns"] = ("id", "direction", "type", "data", "data2")
+        result_box["columns"] = ("id", "direction", "type", "data", "data2", "xml")
+        result_box["displaycolumns"] = ("id", "direction", "type", "data", "data2")
         result_box.column("#0", width=150, minwidth=10, stretch=tk.NO)
         result_box.column("id", width=50, minwidth=20,
                           stretch=tk.NO, anchor="c")
@@ -877,6 +905,12 @@ if __name__ == "__main__":
         result_box.heading('data2', text='', anchor=tk.CENTER)
 
         result_box.bind('<<TreeviewOpen>>', lambda x: handleOpenEvent(x, result_box))
+
+        message_text_box = tk.Text(master=frame_r, width=20, height=20)
+        copy_to_clip = tk.Button(master=frame_r, text="Copy To Clipboard")
+
+
+
 
         sb = tk.Scrollbar(frame_l, orient=tk.VERTICAL)
         sb.pack(side=tk.RIGHT, fill=tk.Y)
@@ -940,12 +974,19 @@ if __name__ == "__main__":
         parse_button.pack(anchor="center", after=text_box)
         load_button.bind("<Button-1>", load_file_dialog)
         load_button.pack(anchor="center", after=parse_button)
+        parse_snapshot.pack(anchor="center", after=load_button)
+        message_text_box.pack(anchor="center", after=parse_snapshot)
+        copy_to_clip.pack(anchor="center", after=message_text_box)
+        oran_analysis.pack(anchor="center", after=copy_to_clip)
 
-        oran_analysis.pack(anchor="center", after=load_button)
         #back_to_tree.place(y=560, relx=.5, anchor="center")
         back_to_tree.pack_forget()
+
         back_to_tree.bind("<Button-1>", back_to_tree_view)
         oran_analysis.bind("<Button-1>", launch_oran_analysis)
+        copy_to_clip.bind("<Button-1>", copy_to_clipboard)
+        result_box.bind("<Button-1>", show_message_in_text)
+
 
         frame_l.pack(fill=tk.BOTH, side=tk.LEFT, expand=True)
         frame_r.grid_propagate(False)
