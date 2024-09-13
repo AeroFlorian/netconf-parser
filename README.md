@@ -37,6 +37,8 @@ If the log file is heavy (multiple MBs), a progress bar appears on the right sid
 
 ![Progress Bar](doc/progress_bar.gif)
 
+Some RPC Replies may be very heavy and result in NetConfParser taking several seconds to display the whole data.
+If you want to speed up the performance, you can uncheck the box `Parse Enormous RPCs` (default behaviour)
 
 ## Messages Display
 ### Main Window
@@ -67,6 +69,13 @@ Then click on `Filter` button to display
 Only syntax supported is exact syntax (maybe regex will come)
 To clear your search and go back to the full tree, click on `Clear Search` button
 `Clear Tree` will clear the whole window.
+
+### Copy Messages
+Upon selecting a message, a formatted version of this message is displayed in the box on the right side:
+
+![CopyToClipBoard](doc/copy_to_clipboard.gif)
+
+You can then use the button `Copy To Clipboard` to copy it.
 
 ## ORAN Analysis
 By clicking on the right button `See ORAN Analysis`, the view switches from message display to 
