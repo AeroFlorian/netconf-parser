@@ -24,7 +24,7 @@ items = []
 received_rpcs = []
 message_id_without_counterpart = []
 oran_steps = []
-VERSION = "v0.9"
+VERSION = "v0.10"
 cells_found=set()
 ENORMOUS_RPC_SIZE = 20000
 
@@ -596,6 +596,7 @@ def parse_file(full_lines):
             d = "->" if not hello_req else "<-"
             tags = "hello"
             hello_req = not hello_req
+            message_id_without_counterpart.append([])
             data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
             data = re.sub(r'<session-id.*/session-id>', '', data)
         elif element[0] != "": #rpc case
@@ -606,7 +607,7 @@ def parse_file(full_lines):
             d = "->"
             tags = "req"
             if "get-schema" not in data:
-                message_id_without_counterpart.append(int(message_id))
+                message_id_without_counterpart[-1].append(int(message_id))
             else:
                 message_type = "get-schema"
                 tags = "schema"
@@ -625,8 +626,9 @@ def parse_file(full_lines):
             else:
                 data = f"<rpc-reply>{data}</rpc-reply>"
                 tags = "resp"
-            if int(message_id) in message_id_without_counterpart:
-                message_id_without_counterpart.remove(int(message_id))
+            if int(message_id) in message_id_without_counterpart[-1]:
+                message_id_without_counterpart[-1].remove(int(message_id))
+
             data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
             data = re.sub(r'^.*?<', '<', data, flags=re.DOTALL)
             data = re.sub(r'>[^>]*?$', '>', data, flags=re.DOTALL)
@@ -749,9 +751,12 @@ def threaded_operation(full):
     result_box.pack_forget()
     parse_file(full)
     # Apply no counterparts tag
-    for child in result_box.get_children():
-        if result_box.item(child)['values'][0] != "N/A" and int(
-                result_box.item(child)['values'][0]) in message_id_without_counterpart:
+    index = -1
+    for i,child in enumerate(result_box.get_children()):
+        if result_box.item(child)['values'][2] == 'hello':
+            index +=1
+        if index < len(message_id_without_counterpart) and result_box.item(child)['values'][0] != "N/A" and int(
+                result_box.item(child)['values'][0]) in message_id_without_counterpart[index]:
             result_box.item(child, tags=['no-counterpart'])
     result_box.tag_configure("hello", background='lightyellow')
     result_box.tag_configure("req", background='lightblue')
@@ -830,8 +835,15 @@ def load_file(file):
 
     label_pb.pack()
     label_step.pack()
-    with open(file.data, 'r') as f:
-        text_box.insert('1.0', f.readlines())
+    try:
+        file_name = re.sub(r"{", "", file.data)
+        file_name = re.sub(r"}", "", file_name)
+        with open(file_name, 'r') as f:
+            text_box.insert('1.0', f.readlines())
+    except:
+        tk.messagebox.showerror("Error", f"Cannot open file {file_name}")
+        return
+
     get_text_box(None)
     update_title(file.data)
 
