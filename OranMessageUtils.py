@@ -1,4 +1,5 @@
 import re
+from Logger import logger
 
 
 class GenericUtilities:
@@ -9,7 +10,7 @@ class GenericUtilities:
                 return v
             elif isinstance(v, dict):
                 val = self.get_value_if_exists_recurse(v, key)
-                if val is not None:
+                if val is not "":
                     return val
         return ""
 
@@ -33,10 +34,15 @@ class GenericUtilities:
 
     @classmethod
     def get_value_as_list(self, value: object) -> list:
-        if len(value) > 0 and type(value) is not list:
+        if len(value) and type(value) is not list:
             return [value]
         return value
 
+    @classmethod
+    def get_value_as_item(self, value: list) -> object:
+        if value and len(value) and type(value[0]) is list:
+            return value[0]
+        return value
 
 class OranSpecificUtilities:
 
@@ -55,8 +61,19 @@ class OranSpecificUtilities:
         return -1
 
     @classmethod
-    def get_supported_techs(self, array, direction):
+    def get_supported_techs(self, array: dict, direction: str) -> str:
         try:
             return self.display_list_tech(array["capabilities"][f"supported-technology-{direction}"])
         except:
             return ""
+
+    @classmethod
+    def get_type_from_endpoint(cls, scs: str, dir: str) -> str:
+        if dir == "ul":
+            if scs == "KHZ_1_25":
+                return "PRACH"
+            return "DATA"
+        else:
+            if scs == "KHZ_240":
+                return "SSB"
+            return "DATA"

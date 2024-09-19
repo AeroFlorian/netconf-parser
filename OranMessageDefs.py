@@ -14,8 +14,8 @@ class OranMessage:
     def __init__(self, netconf_message: NetconfMessageDefs.Message):
         if netconf_message is not None:
             self.message_id: int = netconf_message.message_id
-            self.category: str = None
-            self.information: str = None
+            self.category: str = ""
+            self.information: str = ""
             self.data_to_display: dict = defaultdict(lambda: {})
             self.status: OranMessageStatus = OranMessageStatus.SUCCESS
             self.is_important_in_analysis: bool = False
@@ -38,6 +38,283 @@ class OranRpcMessage(OranMessage):
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.Message):
         if "edit-config" not in netconf_message.data:
             return
+        if GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "user-plane-configuration"):
+            self.fill_user_plane_configuration(netconf_message.data)
+
+    def fill_user_plane_configuration(self, data):
+        low_level_rx_endpoints = GenericUtilities.get_value_as_list(
+            GenericUtilities.get_all_values_for_key_recurse(data, "low-level-rx-endpoints", []))
+        if low_level_rx_endpoints:
+            self.fill_low_level_rx_endpoints(low_level_rx_endpoints)
+        low_level_tx_endpoints = GenericUtilities.get_value_as_list(
+            GenericUtilities.get_all_values_for_key_recurse(data, "low-level-tx-endpoints", []))
+        if low_level_tx_endpoints:
+            self.fill_low_level_tx_endpoints(low_level_tx_endpoints)
+        low_level_rx_links = GenericUtilities.get_value_as_item(
+            GenericUtilities.get_all_values_for_key_recurse(data, "low-level-rx-links", []))
+        if low_level_rx_links:
+            self.fill_low_level_rx_links(low_level_rx_links)
+        low_level_tx_links = GenericUtilities.get_value_as_item(
+            GenericUtilities.get_all_values_for_key_recurse(data, "low-level-tx-links", []))
+        if low_level_tx_links:
+            self.fill_low_level_tx_links(low_level_tx_links)
+        rx_array_carriers = GenericUtilities.get_value_as_item(
+            GenericUtilities.get_all_values_for_key_recurse(data, "rx-array-carriers", []))
+        if rx_array_carriers:
+            self.fill_rx_array_carriers(rx_array_carriers)
+        tx_array_carriers = GenericUtilities.get_value_as_item(
+            GenericUtilities.get_all_values_for_key_recurse(data, "tx-array-carriers", []))
+        if tx_array_carriers:
+            self.fill_tx_array_carriers(tx_array_carriers)
+
+
+    def fill_low_level_rx_endpoints(self, low_level_rx_endpoints):
+        if GenericUtilities.get_value_if_exists_recurse(low_level_rx_endpoints[0][0], "eaxc-id"):
+            self.fill_creation_low_level_rx_endpoints(low_level_rx_endpoints)
+        else:
+            self.fill_deletion_low_level_rx_endpoints(low_level_rx_endpoints)
+
+    def fill_creation_low_level_rx_endpoints(self, low_level_rx_endpoints):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"] = [
+            {
+                "name": rx_endpoint["name"],
+                "eaxc-id": GenericUtilities.get_value_if_exists_recurse(rx_endpoint, "eaxc-id"),
+                "type": OranSpecificUtilities.get_type_from_endpoint(
+                    GenericUtilities.get_value_if_exists_recurse(rx_endpoint, "scs"), "ul")
+            }
+            for rx_endpoint in low_level_rx_endpoints[0]
+        ]
+        types_d = defaultdict(lambda: 0)
+        for endpoint in self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"]:
+            types_d[endpoint["type"]] += 1
+        types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
+        self.information += f'O-DU creates {len(low_level_rx_endpoints[0])} Low Level Rx Endpoints {types} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_low_level_rx_endpoints(self, low_level_rx_endpoints):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"] = [
+            {
+                "name": rx_endpoint["name"]
+            }
+            for rx_endpoint in low_level_rx_endpoints[0]
+        ]
+        self.information += f'O-DU deletes {len(low_level_rx_endpoints[0])} Low Level Rx Endpoints '
+        self.is_important_in_analysis = True
+
+    def fill_low_level_tx_endpoints(self, low_level_tx_endpoints):
+        if GenericUtilities.get_value_if_exists_recurse(low_level_tx_endpoints[0][0], "eaxc-id"):
+            self.fill_creation_low_level_tx_endpoints(low_level_tx_endpoints)
+        else:
+            self.fill_deletion_low_level_tx_endpoints(low_level_tx_endpoints)
+
+    def fill_creation_low_level_tx_endpoints(self, low_level_tx_endpoints):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"] = [
+            {
+                "name": tx_endpoint["name"],
+                "eaxc-id": GenericUtilities.get_value_if_exists_recurse(tx_endpoint, "eaxc-id"),
+                "type": OranSpecificUtilities.get_type_from_endpoint(
+                    GenericUtilities.get_value_if_exists_recurse(tx_endpoint, "scs"), "dl")
+            }
+            for tx_endpoint in low_level_tx_endpoints[0]
+        ]
+        types_d = defaultdict(lambda: 0)
+        for endpoint in self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"]:
+            types_d[endpoint["type"]] += 1
+        types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
+        self.information += f'O-DU creates {len(low_level_tx_endpoints[0])} Low Level Tx Endpoints {types} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_low_level_tx_endpoints(self, low_level_tx_endpoints):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"] = [
+            {
+                "name": tx_endpoint["name"]
+            }
+            for tx_endpoint in low_level_tx_endpoints[0]
+        ]
+        self.information += f'O-DU deletes {len(low_level_tx_endpoints[0])} Low Level Tx Endpoints '
+        self.is_important_in_analysis = True
+
+    def fill_low_level_rx_links(self, low_level_rx_links):
+        if GenericUtilities.get_value_if_exists_recurse(low_level_rx_links[0], "rx-array-carrier"):
+            self.fill_creation_low_level_rx_links(low_level_rx_links)
+        else:
+            self.fill_deletion_low_level_rx_links(low_level_rx_links)
+
+    def fill_creation_low_level_rx_links(self, low_level_rx_links):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-rx-links"] = [
+            {
+                "name": rx_link["name"],
+                "rx-array-carrier": rx_link["rx-array-carrier"],
+                "low-level-rx-endpoint": rx_link["low-level-rx-endpoint"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(rx_link["name"]))
+            }
+            for rx_link in low_level_rx_links
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-rx-links"]]))
+        self.information += f'O-DU creates {len(low_level_rx_links)} Low Level Rx Links for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_low_level_rx_links(self, low_level_rx_links):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-rx-links"] = [
+            {
+                "name": rx_link["name"]
+            }
+            for rx_link in low_level_rx_links
+        ]
+        self.information += f'O-DU deletes {len(low_level_rx_links)} Low Level Rx Links'
+        self.is_important_in_analysis = True
+
+    def fill_low_level_tx_links(self, low_level_tx_links):
+        if GenericUtilities.get_value_if_exists_recurse(low_level_tx_links[0], "tx-array-carrier"):
+            self.fill_creation_low_level_tx_links(low_level_tx_links)
+        else:
+            self.fill_deletion_low_level_tx_links(low_level_tx_links)
+
+    def fill_creation_low_level_tx_links(self, low_level_tx_links):
+        self.category = 'RU' #TODO fix TAG CellId Here
+        self.data_to_display["User Plane Configuration"]["low-level-tx-links"] = [
+            {
+                "name": tx_link["name"],
+                "tx-array-carrier": tx_link["tx-array-carrier"],
+                "low-level-tx-endpoint": tx_link["low-level-tx-endpoint"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(tx_link["name"]))
+            }
+            for tx_link in low_level_tx_links
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-tx-links"]]))
+        self.information += f'O-DU creates {len(low_level_tx_links)} Low Level Tx Links for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_low_level_tx_links(self, low_level_tx_links):
+        self.category = 'RU'
+        self.data_to_display["User Plane Configuration"]["low-level-tx-links"] = [
+            {
+                "name": tx_link["name"]
+            }
+            for tx_link in low_level_tx_links
+        ]
+        self.information += f'O-DU deletes {len(low_level_tx_links)} Low Level Tx Links'
+        self.is_important_in_analysis = True
+
+    def fill_rx_array_carriers(self, rx_array_carriers):
+        if GenericUtilities.get_value_if_exists_recurse(rx_array_carriers[0], "type") or \
+                GenericUtilities.get_value_if_exists_recurse(rx_array_carriers[0], "channel-bandwidth"):
+            self.fill_creation_rx_array_carriers(rx_array_carriers)
+        elif GenericUtilities.get_value_if_exists_recurse(rx_array_carriers[0], "active"):
+            self.fill_activation_deactivation_rx_array_carriers(rx_array_carriers)
+        elif not GenericUtilities.get_value_if_exists_recurse(rx_array_carriers[0], "n-ta-offset"):
+            self.fill_deletion_rx_array_carriers(rx_array_carriers)
+
+    def fill_activation_deactivation_rx_array_carriers(self, rx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["rx-array-carriers"] = [
+            {
+                "name": rx_array_carrier["name"],
+                "active": rx_array_carrier["active"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(rx_array_carrier["name"]))
+            }
+            for rx_array_carrier in rx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["rx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        active = "Activates" if rx_array_carriers[0]["active"] == "ACTIVE" else "Deactivates"
+        self.information += f'O-DU {active} {len(rx_array_carriers)} Rx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_creation_rx_array_carriers(self, rx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["rx-array-carriers"] = [
+            {
+                "name": array_carrier["name"],
+                "active": GenericUtilities.get_value_if_exists_recurse(array_carrier, "active"),
+                "type": "N/A" if GenericUtilities.get_value_if_exists_recurse(array_carrier,
+                                    "type") == "" else GenericUtilities.get_value_if_exists_recurse(
+                    array_carrier, "type"),
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
+            }
+            for array_carrier in rx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["rx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-DU Creates {len(rx_array_carriers)} Rx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_rx_array_carriers(self, rx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["rx-array-carriers"] = [
+            {
+                "name": array_carrier["name"]
+            }
+            for array_carrier in rx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["rx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-DU Deletes {len(rx_array_carriers)} Rx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_tx_array_carriers(self, tx_array_carriers):
+        if GenericUtilities.get_value_if_exists_recurse(tx_array_carriers[0], "type") or \
+                GenericUtilities.get_value_if_exists_recurse(tx_array_carriers[0], "channel-bandwidth"):
+            self.fill_creation_tx_array_carriers(tx_array_carriers)
+        elif GenericUtilities.get_value_if_exists_recurse(tx_array_carriers[0], "active"):
+            self.fill_activation_deactivation_tx_array_carriers(tx_array_carriers)
+        elif not GenericUtilities.get_value_if_exists_recurse(tx_array_carriers[0], "gain"):
+            self.fill_deletion_tx_array_carriers(tx_array_carriers)
+
+    def fill_activation_deactivation_tx_array_carriers(self, tx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["tx-array-carriers"] = [
+            {
+                "name": tx_array_carrier["name"],
+                "active": tx_array_carrier["active"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(tx_array_carrier["name"]))
+            }
+            for tx_array_carrier in tx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["tx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        active = "Activates" if tx_array_carriers[0]["active"] == "ACTIVE" else "Deactivates"
+        self.information += f'O-DU {active} {len(tx_array_carriers)} Tx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_creation_tx_array_carriers(self, tx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["tx-array-carriers"] = [
+            {
+                "name": array_carrier["name"],
+                "active": GenericUtilities.get_value_if_exists_recurse(array_carrier, "active"),
+                "type": "N/A" if GenericUtilities.get_value_if_exists_recurse(array_carrier,
+                                    "type") == "" else GenericUtilities.get_value_if_exists_recurse(
+                    array_carrier, "type"),
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
+            }
+            for array_carrier in tx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["tx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-DU Creates {len(tx_array_carriers)} Tx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
+
+    def fill_deletion_tx_array_carriers(self, tx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["tx-array-carriers"] = [
+            {
+                "name": array_carrier["name"]
+            }
+            for array_carrier in tx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["tx-array-carriers"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-DU Deletes {len(tx_array_carriers)} Tx Array Carriers for cell {cell_id} '
+        self.is_important_in_analysis = True
 
 
 class OranNotificationMessage(OranMessage):
@@ -45,8 +322,47 @@ class OranNotificationMessage(OranMessage):
         super(OranNotificationMessage, self).__init__(netconf_message)
 
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.Message):
-        logger.error('OranNotificationMessage.fill_from_netconf_message() not implemented')
+        if "tx-array-carriers-state-change" in netconf_message.data:
+            logger.info(f"Received tx-array-carrier-state-change notification ")
+            tx_array_carriers = GenericUtilities.get_value_as_list(
+                GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "tx-array-carriers"))
+            self.fill_tx_array_carrier_state_change(tx_array_carriers)
+        elif "rx-array-carriers-state-change" in netconf_message.data:
+            rx_array_carriers = GenericUtilities.get_value_as_list(
+                GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "rx-array-carriers"))
+            self.fill_rx_array_carrier_state_change(rx_array_carriers)
 
+    def fill_tx_array_carrier_state_change(self, tx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"] = [
+            {
+                "name": array_carrier["name"],
+                "state": array_carrier["state"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
+            }
+            for array_carrier in tx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-RU Changes state of {len(tx_array_carriers)} Tx Array Carriers to ' \
+                            f'{self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"][0]["state"]} for cell {cell_id}'
+        self.is_important_in_analysis = True
+
+    def fill_rx_array_carrier_state_change(self, rx_array_carriers):
+        self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"] = [
+            {
+                "name": array_carrier["name"],
+                "state": array_carrier["state"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
+            }
+            for array_carrier in rx_array_carriers
+        ]
+        cell_id = ', '.join(
+            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"]]))
+        self.category = f'Cell {cell_id}'
+        self.information += f'O-RU Changes state of {len(rx_array_carriers)} Rx Array Carriers to ' \
+                            f'{self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"][0]["state"]} for cell {cell_id}'
+        self.is_important_in_analysis = True
 
 class OranRpcReplyMessage(OranMessage):
     def __init__(self, netconf_message: NetconfMessageDefs.RpcReplyMessage):
