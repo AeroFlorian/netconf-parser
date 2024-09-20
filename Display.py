@@ -74,7 +74,7 @@ def pretty_print_xml(xml_str: str):
 
 
 class ResultBox(ttk.Treeview):
-    def __init__(self, frame: tk.Frame, text_box: tk.Text):
+    def __init__(self, frame: tk.Frame, text_box: tk.Text, filter_text: tk.Entry, parse_enormous_rpc: tk.IntVar, pb: ttk.Progressbar, label: tk.Label):
         super().__init__(master=frame, columns=("id", "direction", "type", "data", "data2", "xml"),
                          displaycolumns=("id", "direction", "type", "data", "data2"))
         self.column("#0", width=150, minwidth=10, stretch=tk.NO)
@@ -92,14 +92,31 @@ class ResultBox(ttk.Treeview):
         self.messages: list = []
         self.bind('<<TreeviewOpen>>', lambda x: handleOpenEvent(x, self))
         self.text_box = text_box
+        self.filter_text = filter_text
+        self.parse_enormous_rpc = parse_enormous_rpc
         self.bind("<Button-1>", self.show_message_in_text)
+        self.saved_items_for_search = []
+        self.detached_items = []
+        self.filter_text.bind("<Return>", self.search)
+        self.pb = pb
+        self.label = label
 
     def add_messages(self, messages: list[NetconfMessageDefs.Message]):
+        self.pb.pack(fill=tk.Y, pady=30)
+        self.label.pack(anchor='center')
         self.messages = messages
-        for message in messages:
-            parent = self.insert("", tk.END, values=message.get_values(), tags=message.tag.name.lower())
-            if len(message.raw_data) < ENORMOUS_RPC:
+        for index,message in enumerate(messages):
+            self.pb["value"] = int(index/len(messages)*100)
+            self.label["text"] = f"   {int(index/len(messages)*100)}%\n{index+1}/{len(messages)}"
+            if len(message.raw_data) < ENORMOUS_RPC or self.parse_enormous_rpc.get() == 1:
+                parent = self.insert("", tk.END, values=message.get_values(), tags=message.tag.name.lower())
                 json_tree(parent, message.data, message.tag.name.lower(), box=self, xml=message.raw_data)
+            else:
+                values = list(message.get_values())
+                values[3] = "\t\t\tData too large to display"
+                parent = self.insert("", tk.END, values=tuple(values), tags=message.tag.name.lower())
+        self.pb.pack_forget()
+        self.label.pack_forget()
 
     def show_message_in_text(self, event):
         item = self.identify('item', event.x, event.y)
@@ -123,16 +140,34 @@ class ResultBox(ttk.Treeview):
         self.tag_configure("rpc_error", background='#ff6242')
         self.tag_configure("rpc_without_counterpart", background='orange')
 
-
+    def search_in_element(self,query, element):
+        if query.lower() in str(self.item(element)['values'][2]) or query.lower() in str(
+                self.item(element)['values'][3]) or query.lower() in str(self.item(element)['values'][4]):
+            return True
+        for child in self.get_children(element):
+            if self.search_in_element(query, child):
+                return True
+        return False
 
     def search(self, event):
-        pass
+        self.clear_search(event)
+        query = self.filter_text.get()
+        selections = []
+        for child in self.get_children():
+            if not self.search_in_element(query, child):
+                selections.append(child)
+                self.detached_items.append(child)
+            self.saved_items_for_search.append(child)
+        for item in selections:
+            self.detach(item)
 
     def clear_search(self, event):
-        pass
+        for (index, i) in enumerate(self.saved_items_for_search):
+            if i in self.detached_items:
+                self.reattach(i, '', index)
+        self.detached_items.clear()
+        self.saved_items_for_search.clear()
 
-    def clear_tree(self, event):
-        pass
 
 
 class AnalysisBox(ttk.Treeview):
@@ -221,7 +256,11 @@ class NetConfParserWindow(TkinterDnD.Tk):
         clear_tree_button = tk.Button(master=frame_l, text="Clear Tree")
 
         message_text_box = tk.Text(master=frame_r, width=20, height=20)
-        result_box = ResultBox(frame_l, message_text_box)
+        pb = ttk.Progressbar(frame_r, orient='vertical', mode='determinate', length=280)
+        label_pb = ttk.Label(frame_r, text="0%")
+
+        result_box = ResultBox(frame_l, message_text_box, filter_text, parse_enormous_rpc, pb, label_pb)
+
         copy_to_clip = tk.Button(master=frame_r, text="Copy To Clipboard")
 
         sb = tk.Scrollbar(frame_l, orient=tk.VERTICAL)
@@ -243,7 +282,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         filter_button.place(y=20, x=500, width=200)
         clear_button.bind("<Button-1>", result_box.clear_search)
         clear_button.place(y=20, x=710, width=200)
-        clear_tree_button.bind("<Button-1>", result_box.clear_tree)
+        clear_tree_button.bind("<Button-1>", self.clear_tree)
         clear_tree_button.place(y=20, x=920, width=200)
         result_box.drop_target_register(DND_FILES)
         result_box.dnd_bind('<<Drop>>', self.load_file)
@@ -251,11 +290,8 @@ class NetConfParserWindow(TkinterDnD.Tk):
         analysis_box.bind('<<Drop>>', self.load_file)
 
         result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
-        pb = ttk.Progressbar(frame_r, orient='vertical', mode='determinate', length=280)
-        pb.pack_forget()
-        label_step = ttk.Label(frame_r, text="... Starting ...")
-        label_step.pack_forget()
-        label_pb = ttk.Label(frame_r, text="0%")
+
+
         label_pb.pack_forget()
         analysis_box.pack_forget()
 
@@ -272,6 +308,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         back_to_tree.bind("<Button-1>", self.back_to_tree_view)
         oran_analysis.bind("<Button-1>", self.launch_oran_analysis)
         copy_to_clip.bind("<Button-1>", self.copy_to_clipboard)
+        pb.pack_forget()
 
         frame_l.pack(fill=tk.BOTH, side=tk.LEFT, expand=True)
         frame_r.grid_propagate(False)
@@ -309,8 +346,10 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.analysis_box.add_messages(netconf_parser.get_oran_messages())
         self.analysis_box.apply_tags()
         self.back_to_tree_view(None)
+        self['cursor'] = 'arrow'
 
     def load_and_parse_file(self, file):
+        self['cursor'] = 'watch'
         self.result_box.clear_all()
         self.analysis_box.clear_all()
         self.pack_forget_boxes()
@@ -359,3 +398,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         full = self.message_text_box.get("1.0", tk.END)
         self.clipboard_append(full)
         self.update()
+
+    def clear_tree(self, event):
+        self.result_box.clear_all()
+        self.analysis_box.clear_all()

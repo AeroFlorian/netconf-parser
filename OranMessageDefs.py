@@ -333,7 +333,6 @@ class OranNotificationMessage(OranMessage):
 
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.Message):
         if "tx-array-carriers-state-change" in netconf_message.data:
-            logger.info(f"Received tx-array-carrier-state-change notification ")
             tx_array_carriers = GenericUtilities.get_value_as_list(
                 GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "tx-array-carriers"))
             self.fill_tx_array_carrier_state_change(tx_array_carriers)
