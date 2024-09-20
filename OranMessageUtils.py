@@ -10,7 +10,7 @@ class GenericUtilities:
                 return v
             elif isinstance(v, dict):
                 val = self.get_value_if_exists_recurse(v, key)
-                if val is not "":
+                if val != "":
                     return val
         return ""
 

@@ -48,6 +48,12 @@ class ResultTree:
         for netconf_session in self.netconf_sessions:
             netconf_session.apply_messages_without_counterpart()
 
+    def get_messages(self):
+        messages = []
+        for session in self.netconf_sessions:
+            messages += session.messages
+        return messages
+
 
 class OranAnalysisTree:
     def __init__(self):
@@ -73,6 +79,8 @@ class OranAnalysisTree:
         for message in self.analysis_messages:
             logger.info(message)
 
+    def get_messages(self):
+        return self.analysis_messages
 
 class Trees:
     def __init__(self):
@@ -136,3 +144,9 @@ class NetConfParser:
 
     def display(self):
         self.trees.display()
+
+    def get_netconf_messages(self):
+        return self.trees.result_tree.get_messages()
+
+    def get_oran_messages(self):
+        return self.trees.analysis_tree.get_messages()

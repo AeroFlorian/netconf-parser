@@ -20,6 +20,7 @@ class OranMessage:
             self.status: OranMessageStatus = OranMessageStatus.SUCCESS
             self.is_important_in_analysis: bool = False
             self.fill_from_netconf_message(netconf_message)
+            self.raw_data = netconf_message.raw_data
 
     def __str__(self):
         return f'{self.message_id} - {self.category} - {self.information} - {self.status}'
@@ -29,6 +30,16 @@ class OranMessage:
 
     def should_be_present_in_analysis(self):
         return self.is_important_in_analysis
+
+    def get_values(self):
+        return (
+            str(self.message_id) if self.message_id >= 0 else "N/A",
+            self.category,
+            "✅" if self.status == OranMessageStatus.SUCCESS else "❎",
+            self.information,
+            "",
+            self.raw_data
+        )
 
 
 class OranRpcMessage(OranMessage):
@@ -66,7 +77,6 @@ class OranRpcMessage(OranMessage):
             GenericUtilities.get_all_values_for_key_recurse(data, "tx-array-carriers", []))
         if tx_array_carriers:
             self.fill_tx_array_carriers(tx_array_carriers)
-
 
     def fill_low_level_rx_endpoints(self, low_level_rx_endpoints):
         if GenericUtilities.get_value_if_exists_recurse(low_level_rx_endpoints[0][0], "eaxc-id"):
@@ -145,7 +155,6 @@ class OranRpcMessage(OranMessage):
             self.fill_deletion_low_level_rx_links(low_level_rx_links)
 
     def fill_creation_low_level_rx_links(self, low_level_rx_links):
-        self.category = 'RU'
         self.data_to_display["User Plane Configuration"]["low-level-rx-links"] = [
             {
                 "name": rx_link["name"],
@@ -157,6 +166,7 @@ class OranRpcMessage(OranMessage):
         ]
         cell_id = ', '.join(
             set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-rx-links"]]))
+        self.category = f'Cell {cell_id}'
         self.information += f'O-DU creates {len(low_level_rx_links)} Low Level Rx Links for cell {cell_id} '
         self.is_important_in_analysis = True
 
@@ -178,7 +188,6 @@ class OranRpcMessage(OranMessage):
             self.fill_deletion_low_level_tx_links(low_level_tx_links)
 
     def fill_creation_low_level_tx_links(self, low_level_tx_links):
-        self.category = 'RU' #TODO fix TAG CellId Here
         self.data_to_display["User Plane Configuration"]["low-level-tx-links"] = [
             {
                 "name": tx_link["name"],
@@ -190,6 +199,7 @@ class OranRpcMessage(OranMessage):
         ]
         cell_id = ', '.join(
             set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-tx-links"]]))
+        self.category = f'Cell {cell_id}'
         self.information += f'O-DU creates {len(low_level_tx_links)} Low Level Tx Links for cell {cell_id} '
         self.is_important_in_analysis = True
 
@@ -235,7 +245,7 @@ class OranRpcMessage(OranMessage):
                 "name": array_carrier["name"],
                 "active": GenericUtilities.get_value_if_exists_recurse(array_carrier, "active"),
                 "type": "N/A" if GenericUtilities.get_value_if_exists_recurse(array_carrier,
-                                    "type") == "" else GenericUtilities.get_value_if_exists_recurse(
+                                                                              "type") == "" else GenericUtilities.get_value_if_exists_recurse(
                     array_carrier, "type"),
                 "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
             }
@@ -291,7 +301,7 @@ class OranRpcMessage(OranMessage):
                 "name": array_carrier["name"],
                 "active": GenericUtilities.get_value_if_exists_recurse(array_carrier, "active"),
                 "type": "N/A" if GenericUtilities.get_value_if_exists_recurse(array_carrier,
-                                    "type") == "" else GenericUtilities.get_value_if_exists_recurse(
+                                                                              "type") == "" else GenericUtilities.get_value_if_exists_recurse(
                     array_carrier, "type"),
                 "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
             }
@@ -342,7 +352,8 @@ class OranNotificationMessage(OranMessage):
             for array_carrier in tx_array_carriers
         ]
         cell_id = ', '.join(
-            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"]]))
+            set([ll["cell_id"] for ll in
+                 self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"]]))
         self.category = f'Cell {cell_id}'
         self.information += f'O-RU Changes state of {len(tx_array_carriers)} Tx Array Carriers to ' \
                             f'{self.data_to_display["User Plane Configuration"]["tx-array-carriers-state-change"][0]["state"]} for cell {cell_id}'
@@ -358,11 +369,13 @@ class OranNotificationMessage(OranMessage):
             for array_carrier in rx_array_carriers
         ]
         cell_id = ', '.join(
-            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"]]))
+            set([ll["cell_id"] for ll in
+                 self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"]]))
         self.category = f'Cell {cell_id}'
         self.information += f'O-RU Changes state of {len(rx_array_carriers)} Rx Array Carriers to ' \
                             f'{self.data_to_display["User Plane Configuration"]["rx-array-carriers-state-change"][0]["state"]} for cell {cell_id}'
         self.is_important_in_analysis = True
+
 
 class OranRpcReplyMessage(OranMessage):
     def __init__(self, netconf_message: NetconfMessageDefs.RpcReplyMessage):
@@ -373,7 +386,7 @@ class OranRpcReplyMessage(OranMessage):
         if netconf_message.tag == NetconfMessageDefs.Tag.RPC_ERROR:
             self.fill_rpc_error()
         elif GenericUtilities.get_value_if_exists_recurse(netconf_message.data,
-                                                                                "supported-mplane-version"):
+                                                          "supported-mplane-version"):
             self.fill_supported_mplane(netconf_message.data)
         elif GenericUtilities.check_value_if_exists_recurse(netconf_message.data, "o-ran-hw:O-RAN-RADIO"):
             self.fill_hardware(netconf_message.data)
@@ -382,9 +395,9 @@ class OranRpcReplyMessage(OranMessage):
         elif GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "user-plane-configuration"):
             self.fill_user_plane_configuration(netconf_message.data)
 
-
     def fill_rpc_error(self):
         self.status = OranMessageStatus.FAILURE
+        self.category = "ERR"
         self.information = f"RPC Error for message id {self.message_id}"
         self.is_important_in_analysis = True
 
@@ -461,9 +474,6 @@ class OranRpcReplyMessage(OranMessage):
             self.information += f'{len(rx_arrays[0])} RX Arrays'
 
 
-
-
-
 class NetconfClientConnectedMessage(OranMessage):
     def __init__(self):
         super(NetconfClientConnectedMessage, self).__init__(None)
@@ -472,3 +482,5 @@ class NetconfClientConnectedMessage(OranMessage):
         self.information = 'Netconf Client connected'
         self.status = OranMessageStatus.SUCCESS
         self.is_important_in_analysis = True
+        self.data_to_display = None
+        self.raw_data = "<hello/>"

@@ -41,6 +41,16 @@ class Message:
     def __str__(self):
         return f'{self.message_type.name} id {self.message_id} tag {self.tag} summary {self.summary} '
 
+    def get_values(self):
+        return (
+            str(self.message_id) if self.message_id >= 0 else "N/A",
+            "<-" if self.direction == Direction.TO_CLIENT else "->",
+            self.message_type.name.lower(),
+            f"\t\t{self.summary}",
+            "",
+            self.raw_data
+        )
+
     def fill_fields(self, data: str):
         logger.error('Message.fill_fields() not implemented')
         return
@@ -102,6 +112,13 @@ class RpcReplyMessage(Message):
         data = re.sub(r'^.*?<', '<', data, flags=re.DOTALL)
         data = re.sub(r'>[^>]*?$', '>', data, flags=re.DOTALL)
         self.data = xmltodict.parse(self.remove_unwanted_parts(data))
+        try:
+            if "data" in self.data['rpc-reply'] and len(self.data['rpc-reply']['data']) < 100:
+                self.summary = f"rpc-reply data {' | '.join(self.data['rpc-reply']['data'].keys())}"
+            else:
+                self.summary = f"rpc-reply {' '.join(self.data['rpc-reply'].keys())}"
+        except:
+            pass
 
 
 class NotificationMessage(Message):
