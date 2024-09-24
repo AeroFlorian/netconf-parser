@@ -357,6 +357,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         # try:
         file_name = re.sub(r"{", "", file)
         file_name = re.sub(r"}", "", file_name)
+        self.title(f"NetConfParser - {VERSION} - {file_name}")
         with open(file_name, 'r') as f:
             data = '\n'.join(f.readlines())
             netconf_parser = MessageParser.NetConfParser(data)

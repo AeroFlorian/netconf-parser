@@ -137,8 +137,11 @@ class NetConfParser:
 
         all_matches = re.findall(reg, filtered_lines, re.MULTILINE | re.DOTALL)
         for match in all_matches:
-            message = RegexToNetconfMessage(match).to_netconf_message()
-            self.trees.handle_message(message)
+            try:
+                message = RegexToNetconfMessage(match).to_netconf_message()
+                self.trees.handle_message(message)
+            except:
+                pass
         self.trees.apply_after_computation_tags()
         return
 
