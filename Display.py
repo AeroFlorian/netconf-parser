@@ -27,7 +27,7 @@ def json_tree(parent, dictionary, tags, depth=0, box=None, xml=""):
         uid = uuid.uuid4()
         if isinstance(dictionary[key], dict):
             box.insert(parent, 'end', uid, text='', values=(
-                "", "", "", "\t" * depth + key, "", xml), tags=tags)
+                "", "", "", "", "\t" * depth + key, "", xml), tags=tags)
             json_tree(uid, dictionary[key], tags, depth + 1, box=box, xml=xml)
         elif isinstance(dictionary[key], list):
             json_tree(parent,
@@ -48,10 +48,10 @@ def json_tree(parent, dictionary, tags, depth=0, box=None, xml=""):
                 for i, v in enumerate(vl):
                     uid = uuid.uuid4()
                     box.insert(parent, 'end', uid, text='', values=(
-                        "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v), xml), tags=tags)
+                        "", "", "", "", "\t" * depth + str(key_without_ns) if i == 0 else "", wrap(v), xml), tags=tags)
             else:
                 box.insert(parent, 'end', uid, text='', values=(
-                    "", "", "", "\t" * depth + str(key_without_ns), wrap(value), xml), tags=tags)
+                    "", "", "", "", "\t" * depth + str(key_without_ns), wrap(value), xml), tags=tags)
 
 
 def open_children(parent, box):
@@ -75,15 +75,17 @@ def pretty_print_xml(xml_str: str):
 
 class ResultBox(ttk.Treeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text, filter_text: tk.Entry, parse_enormous_rpc: tk.IntVar, pb: ttk.Progressbar, label: tk.Label):
-        super().__init__(master=frame, columns=("id", "direction", "type", "data", "data2", "xml"),
-                         displaycolumns=("id", "direction", "type", "data", "data2"))
-        self.column("#0", width=150, minwidth=10, stretch=tk.NO)
+        super().__init__(master=frame, columns=("timestamp", "id", "direction", "type", "data", "data2", "xml"),
+                         displaycolumns=("timestamp", "id", "direction", "type", "data", "data2"))
+        self.column("#0", width=50, minwidth=10, stretch=tk.NO)
+        self.column("timestamp", width=150, minwidth=10, stretch=tk.NO, anchor=tk.CENTER)
         self.column("id", width=50, minwidth=20, stretch=tk.NO, anchor="c")
         self.column("direction", width=50, minwidth=100, stretch=tk.NO, anchor="c")
         self.column("type", width=100, minwidth=100, stretch=tk.NO, anchor="c")
         self.column("data", width=400, minwidth=400)
         self.column("data2", width=200, minwidth=200)
         self.heading('#0', text='', anchor=tk.CENTER)
+        self.heading('timestamp', text='timestamp', anchor=tk.CENTER)
         self.heading('id', text='id', anchor=tk.CENTER)
         self.heading('direction', text='dir', anchor=tk.CENTER)
         self.heading('type', text='type', anchor=tk.CENTER)
@@ -124,7 +126,7 @@ class ResultBox(ttk.Treeview):
             item = self.item(item)
             if item['values']:
                 self.text_box.delete(1.0, tk.END)
-                self.text_box.insert(tk.END, pretty_print_xml(item['values'][5]))
+                self.text_box.insert(tk.END, pretty_print_xml(item['values'][6]))
 
     def clear_all(self):
         self.delete(*self.get_children())
@@ -172,14 +174,16 @@ class ResultBox(ttk.Treeview):
 
 class AnalysisBox(ttk.Treeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text):
-        super().__init__(master=frame, columns=("msg-id", "category", "status", "information", "data2"))
-        self.column("#0", width=50, minwidth=10, stretch=tk.NO)
+        super().__init__(master=frame, columns=("timestamp", "msg-id", "category", "status", "information", "data2"))
+        self.column("#0", width=25, minwidth=10, stretch=tk.NO)
+        self.column("timestamp", width=25, minwidth=10, stretch=tk.NO, anchor=tk.CENTER)
         self.column("msg-id", width=50, minwidth=20, stretch=tk.NO, anchor="c")
         self.column("category", width=100, minwidth=100, stretch=tk.NO, anchor="c")
         self.column("status", width=50, minwidth=100, stretch=tk.NO, anchor="c")
-        self.column("information", width=400, minwidth=400)
+        self.column("information", width=200, minwidth=200)
         self.column("data2", width=200, minwidth=200)
         self.heading('#0', text='', anchor=tk.CENTER)
+        self.heading('timestamp', text='', anchor=tk.CENTER)
         self.heading('msg-id', text='msg-id', anchor=tk.CENTER)
         self.heading('category', text='category', anchor=tk.CENTER)
         self.heading('status', text='status', anchor=tk.CENTER)
@@ -203,7 +207,7 @@ class AnalysisBox(ttk.Treeview):
             item = self.item(item)
             if item['values']:
                 self.text_box.delete(1.0, tk.END)
-                self.text_box.insert(tk.END, pretty_print_xml(item['values'][5]))
+                self.text_box.insert(tk.END, pretty_print_xml(item['values'][6]))
 
     def clear_all(self):
         self.delete(*self.get_children())
