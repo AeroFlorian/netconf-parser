@@ -29,9 +29,9 @@ class Direction(Enum):
 
 
 class Message:
-    def __init__(self, message_id: int, message_type: MessageType, tag: Tag, direction: Direction):
+    def __init__(self, message_id: str, message_type: MessageType, tag: Tag, direction: Direction):
         self.message_type: MessageType = message_type
-        self.message_id: int = message_id
+        self.message_id: str = message_id
         self.raw_data: str = ""
         self.summary: str = ""
         self.tag: Tag = tag
@@ -43,7 +43,7 @@ class Message:
 
     def get_values(self):
         return (
-            str(self.message_id) if self.message_id >= 0 else "N/A",
+            self.message_id if self.message_id else "N/A",
             "<-" if self.direction == Direction.TO_CLIENT else "->",
             self.message_type.name.lower(),
             f"\t\t{self.summary}",
@@ -66,7 +66,7 @@ class Message:
 
 
 class RpcMessage(Message):
-    def __init__(self, message_id: int, data: str):
+    def __init__(self, message_id: str, data: str):
         super(RpcMessage, self).__init__(message_id, MessageType.RPC, Tag.RPC_WITHOUT_COUNTERPART, Direction.TO_SERVER)
         self.fill_fields(data)
 
@@ -97,7 +97,7 @@ class RpcMessage(Message):
 
 
 class RpcReplyMessage(Message):
-    def __init__(self, message_id: int, data: str):
+    def __init__(self, message_id: str, data: str):
         super(RpcReplyMessage, self).__init__(message_id, MessageType.RPC_REPLY, Tag.RPC_REPLY, Direction.TO_CLIENT)
         self.fill_fields(data)
 
@@ -123,7 +123,7 @@ class RpcReplyMessage(Message):
 
 class NotificationMessage(Message):
     def __init__(self, data: str):
-        super(NotificationMessage, self).__init__(-1, MessageType.NOTIFICATION, Tag.NOTIFICATION, Direction.TO_CLIENT)
+        super(NotificationMessage, self).__init__("N/A", MessageType.NOTIFICATION, Tag.NOTIFICATION, Direction.TO_CLIENT)
         self.fill_fields(data)
 
     def fill_fields(self, data: str):
@@ -139,7 +139,7 @@ class NotificationMessage(Message):
 
 class HelloMessage(Message):
     def __init__(self, data: str):
-        super(HelloMessage, self).__init__(0, MessageType.HELLO, Tag.HELLO, Direction.UNKNOWN)
+        super(HelloMessage, self).__init__("0", MessageType.HELLO, Tag.HELLO, Direction.UNKNOWN)
         self.fill_fields(data)
 
     def fill_fields(self, data: str):
@@ -160,4 +160,4 @@ class HelloMessage(Message):
 
 class EmptyNetconfMessage(Message):
     def __init__(self):
-        super(EmptyNetconfMessage, self).__init__(0, MessageType.HELLO, Tag.HELLO, Direction.UNKNOWN)
+        super(EmptyNetconfMessage, self).__init__("0", MessageType.HELLO, Tag.HELLO, Direction.UNKNOWN)

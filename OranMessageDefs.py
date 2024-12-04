@@ -33,7 +33,7 @@ class OranMessage:
 
     def get_values(self):
         return (
-            str(self.message_id) if self.message_id >= 0 else "N/A",
+            self.message_id if self.message_id else "N/A",
             self.category,
             "✅" if self.status == OranMessageStatus.SUCCESS else "❎",
             self.information,

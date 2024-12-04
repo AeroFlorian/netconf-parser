@@ -3,7 +3,7 @@ import OranMessageDefs
 import LineRemover
 import re
 from Logger import logger
-
+import traceback
 
 class NetconfSession:
     def __init__(self):
@@ -111,9 +111,9 @@ class RegexToNetconfMessage:
 
     def to_netconf_message(self):
         if self.match[0] != '':
-            return NetconfMessageDefs.RpcMessage(int(self.match[0]), self.match[1])
+            return NetconfMessageDefs.RpcMessage(self.match[0], self.match[1])
         elif self.match[2] != '':
-            return NetconfMessageDefs.RpcReplyMessage(int(self.match[2]), self.match[3])
+            return NetconfMessageDefs.RpcReplyMessage(self.match[2], self.match[3])
         elif self.match[4] != '':
             return NetconfMessageDefs.NotificationMessage(self.match[4])
         elif self.match[5] != '':
@@ -130,8 +130,8 @@ class NetConfParser:
 
     def parse(self):
         filtered_lines = LineRemover.LineRemover().remove_unwanted_parts(self.data)
-        reg = r'<rpc .*? message-id=.(\d+).>(.*?)</rpc>|' \
-              r'<rpc-reply .*? message-id=.(\d+).>(.*?)</rpc-reply>|' \
+        reg = r'<rpc .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc>|' \
+              r'<rpc-reply .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc-reply>|' \
               r'<notification .*?/eventTime>(.*?)</notification>|' \
               r'<hello xmlns=\".*?\">(.*?)</hello>'
 
@@ -140,8 +140,8 @@ class NetConfParser:
             try:
                 message = RegexToNetconfMessage(match).to_netconf_message()
                 self.trees.handle_message(message)
-            except:
-                pass
+            except Exception as e:
+                print(traceback.format_exc())
         self.trees.apply_after_computation_tags()
         return
 
