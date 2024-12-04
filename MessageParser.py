@@ -3,6 +3,7 @@ import OranMessageDefs
 import LineRemover
 import re
 from Logger import logger
+import TimestampComputer
 import traceback
 
 class NetconfSession:
@@ -106,16 +107,17 @@ class Trees:
 
 
 class RegexToNetconfMessage:
-    def __init__(self, match):
+    def __init__(self, match, timestampcomputer):
         self.match = match
+        self.timestampcomputer = timestampcomputer
 
     def to_netconf_message(self):
         if self.match[0] != '':
-            return NetconfMessageDefs.RpcMessage(self.match[0], self.match[1])
+            return NetconfMessageDefs.RpcMessage(self.match[0], self.match[1], self.timestampcomputer)
         elif self.match[2] != '':
-            return NetconfMessageDefs.RpcReplyMessage(self.match[2], self.match[3])
+            return NetconfMessageDefs.RpcReplyMessage(self.match[2], self.match[3], self.timestampcomputer)
         elif self.match[4] != '':
-            return NetconfMessageDefs.NotificationMessage(self.match[4])
+            return NetconfMessageDefs.NotificationMessage(self.match[4], self.timestampcomputer)
         elif self.match[5] != '':
             return NetconfMessageDefs.HelloMessage(self.match[5])
         else:
@@ -127,8 +129,10 @@ class NetConfParser:
     def __init__(self, data: str):
         self.data = data
         self.trees = Trees()
+        self.timestamp_computer = TimestampComputer.TimestampComputer()
 
     def parse(self):
+        self.timestamp_computer.parse(self.data)
         filtered_lines = LineRemover.LineRemover().remove_unwanted_parts(self.data)
         reg = r'<rpc .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc>|' \
               r'<rpc-reply .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc-reply>|' \
@@ -138,7 +142,7 @@ class NetConfParser:
         all_matches = re.findall(reg, filtered_lines, re.MULTILINE | re.DOTALL)
         for match in all_matches:
             try:
-                message = RegexToNetconfMessage(match).to_netconf_message()
+                message = RegexToNetconfMessage(match, self.timestamp_computer).to_netconf_message()
                 self.trees.handle_message(message)
             except Exception as e:
                 print(traceback.format_exc())

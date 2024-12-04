@@ -2,6 +2,7 @@ from enum import Enum
 from Logger import logger
 import re
 import xmltodict
+import TimestampComputer
 
 
 class MessageType(Enum):
@@ -37,12 +38,14 @@ class Message:
         self.tag: Tag = tag
         self.direction: Direction = direction
         self.data: dict = {}
+        self.timestamp: str = self.get_timestamp()
 
     def __str__(self):
         return f'{self.message_type.name} id {self.message_id} tag {self.tag} summary {self.summary} '
 
     def get_values(self):
         return (
+            self.timestamp,
             self.message_id if self.message_id else "N/A",
             "<-" if self.direction == Direction.TO_CLIENT else "->",
             self.message_type.name.lower(),
@@ -64,11 +67,15 @@ class Message:
     def received_reply(self):
         logger.error('Message.receive_reply() not implemented')
 
+    def get_timestamp(self):
+        return ""
+
 
 class RpcMessage(Message):
-    def __init__(self, message_id: str, data: str):
+    def __init__(self, message_id: str, data: str, timestampcomputer: TimestampComputer.TimestampComputer):
         super(RpcMessage, self).__init__(message_id, MessageType.RPC, Tag.RPC_WITHOUT_COUNTERPART, Direction.TO_SERVER)
         self.fill_fields(data)
+        self.timestamp = timestampcomputer.get_timestamp(self.message_id)
 
     def fill_fields(self, data: str):
         self.raw_data = self.remove_unwanted_parts(f'<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</rpc>')
@@ -97,9 +104,10 @@ class RpcMessage(Message):
 
 
 class RpcReplyMessage(Message):
-    def __init__(self, message_id: str, data: str):
+    def __init__(self, message_id: str, data: str, timestampcomputer: TimestampComputer.TimestampComputer):
         super(RpcReplyMessage, self).__init__(message_id, MessageType.RPC_REPLY, Tag.RPC_REPLY, Direction.TO_CLIENT)
         self.fill_fields(data)
+        self.timestamp = timestampcomputer.get_timestamp(self.message_id)
 
     def fill_fields(self, data: str):
         self.raw_data = self.remove_unwanted_parts(f'<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</rpc-reply>')
@@ -122,9 +130,10 @@ class RpcReplyMessage(Message):
 
 
 class NotificationMessage(Message):
-    def __init__(self, data: str):
+    def __init__(self, data: str, timestampcomputer: TimestampComputer.TimestampComputer):
         super(NotificationMessage, self).__init__("N/A", MessageType.NOTIFICATION, Tag.NOTIFICATION, Direction.TO_CLIENT)
         self.fill_fields(data)
+        self.timestamp = timestampcomputer.get_timestamp("notification")
 
     def fill_fields(self, data: str):
         self.raw_data = self.remove_unwanted_parts(
