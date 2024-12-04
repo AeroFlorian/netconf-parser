@@ -126,7 +126,7 @@ class ResultBox(ttk.Treeview):
             item = self.item(item)
             if item['values']:
                 self.text_box.delete(1.0, tk.END)
-                self.text_box.insert(tk.END, pretty_print_xml(item['values'][5]))
+                self.text_box.insert(tk.END, pretty_print_xml(item['values'][6]))
 
     def clear_all(self):
         self.delete(*self.get_children())
@@ -207,7 +207,7 @@ class AnalysisBox(ttk.Treeview):
             item = self.item(item)
             if item['values']:
                 self.text_box.delete(1.0, tk.END)
-                self.text_box.insert(tk.END, pretty_print_xml(item['values'][5]))
+                self.text_box.insert(tk.END, pretty_print_xml(item['values'][6]))
 
     def clear_all(self):
         self.delete(*self.get_children())
