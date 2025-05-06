@@ -31,6 +31,7 @@ class NetconfSession:
 class ResultTree:
     def __init__(self):
         self.netconf_sessions: list = []
+        self.add_netconf_session()
 
     def add_netconf_session(self):
         self.netconf_sessions.append(NetconfSession())
@@ -75,6 +76,12 @@ class OranAnalysisTree:
         if oran_message.should_be_present_in_analysis():
             self.analysis_messages.append(oran_message)
 
+    def check_message_counterpart(self):
+        for message in self.analysis_messages:
+            message.check_without_counterpart()
+        self.analysis_messages = [ message for message in self.analysis_messages if message.should_be_present_in_analysis()]
+
+
     def display(self):
         logger.info('************** OranAnalysisTree: **************')
         for message in self.analysis_messages:
@@ -104,6 +111,7 @@ class Trees:
 
     def apply_after_computation_tags(self):
         self.result_tree.apply_messages_without_counterpart()
+        self.analysis_tree.check_message_counterpart()
 
 
 class RegexToNetconfMessage:

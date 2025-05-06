@@ -14,7 +14,7 @@ class OranMessage:
     def __init__(self, netconf_message: NetconfMessageDefs.Message):
         if netconf_message is not None:
             self.message_id: int = netconf_message.message_id
-            self.category: str = ""
+            self.category: str = "RU"
             self.information: str = ""
             self.data_to_display: dict = defaultdict(lambda: {})
             self.status: OranMessageStatus = OranMessageStatus.SUCCESS
@@ -42,16 +42,33 @@ class OranMessage:
             self.raw_data
         )
 
+    def check_without_counterpart(self):
+        pass
+
 
 class OranRpcMessage(OranMessage):
     def __init__(self, netconf_message: NetconfMessageDefs.RpcMessage):
         super(OranRpcMessage, self).__init__(netconf_message)
+        self.message = netconf_message
+
+    def check_without_counterpart(self):
+        if self.message.tag == NetconfMessageDefs.Tag.RPC_WITHOUT_COUNTERPART:
+            self.fill_rpc_without_counterpart()
+        else:
+            self.is_important_in_analysis = False
 
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.Message):
+        self.is_important_in_analysis = True
         if "edit-config" not in netconf_message.data:
             return
         if GenericUtilities.get_value_if_exists_recurse(netconf_message.data, "user-plane-configuration"):
             self.fill_user_plane_configuration(netconf_message.data)
+
+    def fill_rpc_without_counterpart(self):
+        self.status = OranMessageStatus.FAILURE
+        self.category = "WRN"
+        self.information = f"RPC Not replied for message id {self.message_id}"
+        self.is_important_in_analysis = True
 
     def fill_user_plane_configuration(self, data):
         low_level_rx_endpoints = GenericUtilities.get_value_as_list(
@@ -379,8 +396,9 @@ class OranNotificationMessage(OranMessage):
 
 class OranRpcReplyMessage(OranMessage):
     def __init__(self, netconf_message: NetconfMessageDefs.RpcReplyMessage):
-        super(OranRpcReplyMessage, self).__init__(netconf_message)
         self.category = 'RU'
+        super(OranRpcReplyMessage, self).__init__(netconf_message)
+
 
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.RpcReplyMessage):
         if netconf_message.tag == NetconfMessageDefs.Tag.RPC_ERROR:

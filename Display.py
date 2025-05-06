@@ -14,7 +14,7 @@ import threading
 import xml.dom.minidom
 from Logger import logger
 
-VERSION = "1.0"
+VERSION = "1.2"
 ENORMOUS_RPC=20000
 
 
@@ -216,6 +216,7 @@ class AnalysisBox(ttk.Treeview):
     def apply_tags(self):
         self.tag_configure("RU", background='lightgreen')
         self.tag_configure("ERR", background='#ff6242')
+        self.tag_configure("WRN", background='#e89149')
         background_cells = [
             "#32cd32",
             "#93dc5c",
