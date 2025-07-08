@@ -14,7 +14,7 @@ import threading
 import xml.dom.minidom
 from Logger import logger
 
-VERSION = "1.2"
+VERSION = "1.3"
 ENORMOUS_RPC=20000
 
 
@@ -143,13 +143,7 @@ class ResultBox(ttk.Treeview):
         self.tag_configure("rpc_without_counterpart", background='orange')
 
     def search_in_element(self,query, element):
-        if query.lower() in str(self.item(element)['values'][2]) or query.lower() in str(
-                self.item(element)['values'][3]) or query.lower() in str(self.item(element)['values'][4]):
-            return True
-        for child in self.get_children(element):
-            if self.search_in_element(query, child):
-                return True
-        return False
+        return re.search(query, str(self.item(element)['values'][6]), re.IGNORECASE) is not None
 
     def search(self, event):
         self.clear_search(event)
@@ -164,11 +158,14 @@ class ResultBox(ttk.Treeview):
             self.detach(item)
 
     def clear_search(self, event):
+        selected_item = self.selection()
         for (index, i) in enumerate(self.saved_items_for_search):
             if i in self.detached_items:
                 self.reattach(i, '', index)
         self.detached_items.clear()
         self.saved_items_for_search.clear()
+        if selected_item:
+            self.see(selected_item)
 
 
 

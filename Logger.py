@@ -46,4 +46,4 @@ class Logger:
         return self.logger
 
 
-logger = Logger('Logger', 'NetConfParser.log', True).getLogger()
+logger = Logger('Logger', None, True).getLogger()

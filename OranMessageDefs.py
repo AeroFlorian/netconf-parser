@@ -54,7 +54,7 @@ class OranRpcMessage(OranMessage):
     def check_without_counterpart(self):
         if self.message.tag == NetconfMessageDefs.Tag.RPC_WITHOUT_COUNTERPART:
             self.fill_rpc_without_counterpart()
-        else:
+        elif not self.information:
             self.is_important_in_analysis = False
 
     def fill_from_netconf_message(self, netconf_message: NetconfMessageDefs.Message):
@@ -97,13 +97,19 @@ class OranRpcMessage(OranMessage):
             self.fill_tx_array_carriers(tx_array_carriers)
 
     def fill_low_level_rx_endpoints(self, low_level_rx_endpoints):
-        if GenericUtilities.get_value_if_exists_recurse(low_level_rx_endpoints[0][0], "eaxc-id"):
-            self.fill_creation_low_level_rx_endpoints(low_level_rx_endpoints)
+        if isinstance(low_level_rx_endpoints[0], list):
+            value = low_level_rx_endpoints[0][0]
+            list_endpoints = low_level_rx_endpoints[0]
         else:
-            self.fill_deletion_low_level_rx_endpoints(low_level_rx_endpoints)
+            value = low_level_rx_endpoints[0]
+            list_endpoints = low_level_rx_endpoints
+        if GenericUtilities.get_value_if_exists_recurse(value, "eaxc-id"):
+            self.fill_creation_low_level_rx_endpoints(list_endpoints)
+        else:
+            self.fill_deletion_low_level_rx_endpoints(list_endpoints)
 
     def fill_creation_low_level_rx_endpoints(self, low_level_rx_endpoints):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"] = [
             {
                 "name": rx_endpoint["name"],
@@ -111,34 +117,40 @@ class OranRpcMessage(OranMessage):
                 "type": OranSpecificUtilities.get_type_from_endpoint(
                     GenericUtilities.get_value_if_exists_recurse(rx_endpoint, "scs"), "ul")
             }
-            for rx_endpoint in low_level_rx_endpoints[0]
+            for rx_endpoint in low_level_rx_endpoints
         ]
         types_d = defaultdict(lambda: 0)
         for endpoint in self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"]:
             types_d[endpoint["type"]] += 1
         types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
-        self.information += f'O-DU creates {len(low_level_rx_endpoints[0])} Low Level Rx Endpoints {types} '
+        self.information += f'O-DU creates {len(low_level_rx_endpoints)} Low Level Rx Endpoints {types} '
         self.is_important_in_analysis = True
 
     def fill_deletion_low_level_rx_endpoints(self, low_level_rx_endpoints):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-rx-endpoints"] = [
             {
                 "name": rx_endpoint["name"]
             }
-            for rx_endpoint in low_level_rx_endpoints[0]
+            for rx_endpoint in low_level_rx_endpoints
         ]
-        self.information += f'O-DU deletes {len(low_level_rx_endpoints[0])} Low Level Rx Endpoints '
+        self.information += f'O-DU deletes {len(low_level_rx_endpoints)} Low Level Rx Endpoints '
         self.is_important_in_analysis = True
 
     def fill_low_level_tx_endpoints(self, low_level_tx_endpoints):
-        if GenericUtilities.get_value_if_exists_recurse(low_level_tx_endpoints[0][0], "eaxc-id"):
-            self.fill_creation_low_level_tx_endpoints(low_level_tx_endpoints)
+        if(isinstance(low_level_tx_endpoints[0], list)):
+            value = low_level_tx_endpoints[0][0]
+            list_endpoints = low_level_tx_endpoints[0]
         else:
-            self.fill_deletion_low_level_tx_endpoints(low_level_tx_endpoints)
+            value = low_level_tx_endpoints[0]
+            list_endpoints = low_level_tx_endpoints
+        if GenericUtilities.get_value_if_exists_recurse(value, "eaxc-id"):
+            self.fill_creation_low_level_tx_endpoints(list_endpoints)
+        else:
+            self.fill_deletion_low_level_tx_endpoints(list_endpoints)
 
     def fill_creation_low_level_tx_endpoints(self, low_level_tx_endpoints):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"] = [
             {
                 "name": tx_endpoint["name"],
@@ -146,24 +158,25 @@ class OranRpcMessage(OranMessage):
                 "type": OranSpecificUtilities.get_type_from_endpoint(
                     GenericUtilities.get_value_if_exists_recurse(tx_endpoint, "scs"), "dl")
             }
-            for tx_endpoint in low_level_tx_endpoints[0]
+            for tx_endpoint in low_level_tx_endpoints
         ]
         types_d = defaultdict(lambda: 0)
         for endpoint in self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"]:
             types_d[endpoint["type"]] += 1
         types = ", " + ' '.join([f"{v} {k}" for k, v in types_d.items()])
-        self.information += f'O-DU creates {len(low_level_tx_endpoints[0])} Low Level Tx Endpoints {types} '
+        self.information += f'O-DU creates {len(low_level_tx_endpoints)} Low Level Tx Endpoints {types} '
         self.is_important_in_analysis = True
 
+
     def fill_deletion_low_level_tx_endpoints(self, low_level_tx_endpoints):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-tx-endpoints"] = [
             {
                 "name": tx_endpoint["name"]
             }
-            for tx_endpoint in low_level_tx_endpoints[0]
+            for tx_endpoint in low_level_tx_endpoints
         ]
-        self.information += f'O-DU deletes {len(low_level_tx_endpoints[0])} Low Level Tx Endpoints '
+        self.information += f'O-DU deletes {len(low_level_tx_endpoints)} Low Level Tx Endpoints '
         self.is_important_in_analysis = True
 
     def fill_low_level_rx_links(self, low_level_rx_links):
@@ -177,19 +190,16 @@ class OranRpcMessage(OranMessage):
             {
                 "name": rx_link["name"],
                 "rx-array-carrier": rx_link["rx-array-carrier"],
-                "low-level-rx-endpoint": rx_link["low-level-rx-endpoint"],
-                "cell_id": str(OranSpecificUtilities.compute_cell_id(rx_link["name"]))
+                "low-level-rx-endpoint": rx_link["low-level-rx-endpoint"]
             }
             for rx_link in low_level_rx_links
         ]
-        cell_id = ', '.join(
-            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-rx-links"]]))
-        self.category = f'Cell {cell_id}'
-        self.information += f'O-DU creates {len(low_level_rx_links)} Low Level Rx Links for cell {cell_id} '
+        self.category = 'Cell'
+        self.information += f'O-DU creates {len(low_level_rx_links)} Low Level Rx Links'
         self.is_important_in_analysis = True
 
     def fill_deletion_low_level_rx_links(self, low_level_rx_links):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-rx-links"] = [
             {
                 "name": rx_link["name"]
@@ -211,18 +221,15 @@ class OranRpcMessage(OranMessage):
                 "name": tx_link["name"],
                 "tx-array-carrier": tx_link["tx-array-carrier"],
                 "low-level-tx-endpoint": tx_link["low-level-tx-endpoint"],
-                "cell_id": str(OranSpecificUtilities.compute_cell_id(tx_link["name"]))
             }
             for tx_link in low_level_tx_links
         ]
-        cell_id = ', '.join(
-            set([ll["cell_id"] for ll in self.data_to_display["User Plane Configuration"]["low-level-tx-links"]]))
-        self.category = f'Cell {cell_id}'
-        self.information += f'O-DU creates {len(low_level_tx_links)} Low Level Tx Links for cell {cell_id} '
+        self.category = 'Cell'
+        self.information += f'O-DU creates {len(low_level_tx_links)} Low Level Tx Links'
         self.is_important_in_analysis = True
 
     def fill_deletion_low_level_tx_links(self, low_level_tx_links):
-        self.category = 'RU'
+        self.category = 'Cell'
         self.data_to_display["User Plane Configuration"]["low-level-tx-links"] = [
             {
                 "name": tx_link["name"]

@@ -66,9 +66,10 @@ Full contents of each message can be displayed by clicking on the `+` sign:
 ### Searching for elements
 You can use the `search` Text Box to display only elements of the tree that contain certain keywords.
 Then click on `Filter` button to display
-Only syntax supported is exact syntax (maybe regex will come)
+Regex syntax is supported (case is ignored)
 To clear your search and go back to the full tree, click on `Clear Search` button
 `Clear Tree` will clear the whole window.
+If you selected an item before clicking on `Clear Search`, then tree will focus back on this element. 
 
 ### Copy Messages
 Upon selecting a message, a formatted version of this message is displayed in the box on the right side:
