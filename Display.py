@@ -13,6 +13,9 @@ import re
 import threading
 import xml.dom.minidom
 from Logger import logger
+import os
+import lzma
+
 
 VERSION = "1.3"
 ENORMOUS_RPC=20000
@@ -339,8 +342,32 @@ class NetConfParserWindow(TkinterDnD.Tk):
         if f:
             self.load_and_parse_file(f.name)
 
+    def extract_xz_file(self, file_path, output_path):
+        try:
+            with lzma.open(file_path) as xz_file:
+                with open(output_path, 'wb') as out_file:
+                    out_file.write(xz_file.read())
+            logger.info(f"Extracted {file_path} to {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to extract {file_path}: {e}")
+
+    def is_xz_file(self, file_path):
+        return file_path.lower().endswith('.xz')
+
+    def handle_xz_file(self, file_path):
+        if self.is_xz_file(file_path):
+            output_path = os.path.splitext(file_path)[0]  # Remove .xz extension
+            self.extract_xz_file(file_path, output_path)
+            return output_path
+        return file_path
+
     def load_file(self, file):
-        self.load_and_parse_file(file.data)
+        try:
+            if self.is_xz_file(file.data):
+                file.data = self.handle_xz_file(file.data)
+            self.load_and_parse_file(file.data)
+        except Exception as e:
+            tk.messagebox.showerror("Error", f"Failed to handle file: {e}")
 
     def threaded_operation(self, netconf_parser):
         self.result_box.add_messages(netconf_parser.get_netconf_messages())

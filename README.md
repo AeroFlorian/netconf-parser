@@ -29,6 +29,7 @@ NetConfParser handles multiple types of Log File:
 
 ## Parsing log file
 NetConfParser supports drag and drop.
+NetConfParser supports unpacking .xz files directly.
   
 ![Drag And Drop](doc/drag_and_drop.gif)
 
