@@ -77,8 +77,48 @@ class RpcMessage(Message):
         self.fill_fields(data)
         self.timestamp = timestampcomputer.get_timestamp(self.message_id)
 
+    def get_edit_config_summary(self, data):
+        modules = ''.join(self.data['edit-config']['config'].keys())
+        table = {}
+        for module in self.data['edit-config']['config'].keys():
+            for object in self.data['edit-config']['config'][module]:
+                if isinstance(self.data['edit-config']['config'][module][object], list):
+                    for object_list in self.data['edit-config']['config'][module][object]:
+                        if "operation" in object_list:
+                            if object not in table:
+                                table[object] = {}
+                            if object_list["operation"] not in table[object]:
+                                table[object][object_list["operation"]] = 0
+                            table[object][object_list["operation"]] += 1
+                        else:
+                            if object not in table:
+                                table[object] = {}
+                            if " " not in table[object]:
+                                table[object][" "] = 0
+                            table[object][" "] += 1
+                elif "operation" in self.data['edit-config']['config'][module][object]:
+                    if object not in table:
+                        table[object] = {}
+                    if self.data['edit-config']['config'][module][object]["operation"] not in table[object]:
+                        table[object][self.data['edit-config']['config'][module][object]["operation"]] = 0
+                    table[object][self.data['edit-config']['config'][module][object]["operation"]] += 1
+                else:
+                    if object not in table and object != "operation":
+                        table[object] = {}
+                    if " " not in table[object]:
+                        table[object][" "] = 0
+                    table[object][" "] += 1
+        summary = f"edit-config {modules} | "
+        operations = []
+        for object in table:
+            for operation in table[object]:
+                operation_str = f'{operation}d ' if len(operation)>1 else 'created/modified '
+                operations.append(f"{table[object][operation]} {operation_str}{object}")
+        return summary + " | ".join(operations)
+
     def fill_fields(self, data: str):
         self.raw_data = self.remove_unwanted_parts(f'<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</rpc>')
+        data = re.sub(r' nc:operation=\"([^\"]+)\">', r"><operation>\1</operation>", data)
         data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
         data = re.sub('\n', '', data)
         self.data = xmltodict.parse(self.remove_unwanted_parts(data))
@@ -92,7 +132,7 @@ class RpcMessage(Message):
                 self.summary = "get"
         elif "edit-config" in self.data:
             try:
-                self.summary = f"edit-config {''.join(self.data['edit-config']['config'].keys())}"
+                self.summary = self.get_edit_config_summary(self.data)
             except:
                 self.summary = "edit-config"
         else:

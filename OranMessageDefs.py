@@ -285,7 +285,8 @@ class OranRpcMessage(OranMessage):
     def fill_deletion_rx_array_carriers(self, rx_array_carriers):
         self.data_to_display["User Plane Configuration"]["rx-array-carriers"] = [
             {
-                "name": array_carrier["name"]
+                "name": array_carrier["name"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
             }
             for array_carrier in rx_array_carriers
         ]
@@ -341,7 +342,8 @@ class OranRpcMessage(OranMessage):
     def fill_deletion_tx_array_carriers(self, tx_array_carriers):
         self.data_to_display["User Plane Configuration"]["tx-array-carriers"] = [
             {
-                "name": array_carrier["name"]
+                "name": array_carrier["name"],
+                "cell_id": str(OranSpecificUtilities.compute_cell_id(array_carrier["name"]))
             }
             for array_carrier in tx_array_carriers
         ]

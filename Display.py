@@ -17,7 +17,7 @@ import os
 import lzma
 
 
-VERSION = "1.3"
+VERSION = "1.4"
 ENORMOUS_RPC=20000
 
 
