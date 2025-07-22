@@ -8,7 +8,6 @@ import NetconfMessageDefs
 import MessageParser
 import textwrap
 import uuid
-import uu
 import re
 import threading
 import xml.dom.minidom
@@ -236,14 +235,11 @@ class NetConfParserWindow(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.netconf_parser = None
-        try:
-            uu.decode('fs_ico_encoded', 'fs.ico')
-        except:
-            pass
         self.title(f"NetConfParser - {VERSION}")
         try:
-            self.wm_iconbitmap('fs.ico')
-            self.iconbitmap('fs.ico')
+            icon_path = os.path.join(os.path.dirname(__file__), 'fs.ico')
+            self.wm_iconbitmap(icon_path)
+            self.iconbitmap(icon_path)
         except:
             pass
         self.state('zoomed')

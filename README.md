@@ -15,22 +15,22 @@ NetConfParser handles multiple types of Log File:
 
 <details>
   <summary>plain xml</summary>
-  
+
 ![Plain XML Log](doc/plain_xml.png)
-  
+
 </details>
 
 <details>
   <summary>netopeer2-server format</summary>
-  
+
 ![Netopeer2-server log](doc/netopeer2_server.png)
-  
+
 </details>
 
 ## Parsing log file
 NetConfParser supports drag and drop.
 NetConfParser supports unpacking .xz files directly.
-  
+
 ![Drag And Drop](doc/drag_and_drop.gif)
 
 
@@ -45,7 +45,7 @@ If you want to speed up the performance, you can uncheck the box `Parse Enormous
 ### Main Window
 After parsing your log file, the different exchanges will appear in the main frame.
 Messages are displayed in the following categories:
-- hello 
+- hello
 - rpc get-schema
 - rpc get
 - rpc
@@ -55,7 +55,7 @@ Messages are displayed in the following categories:
 
 ![Categories](doc/netconfparser.png)
 
-A small summary of the contents of the message is available in the `data` cell. 
+A small summary of the contents of the message is available in the `data` cell.
 
 When a rpc is not answered, it is displayed in orange.
 If the rpc-reply contains an rpc-error, it is displayed in red.
@@ -70,7 +70,7 @@ Then click on `Filter` button to display
 Regex syntax is supported (case is ignored)
 To clear your search and go back to the full tree, click on `Clear Search` button
 `Clear Tree` will clear the whole window.
-If you selected an item before clicking on `Clear Search`, then tree will focus back on this element. 
+If you selected an item before clicking on `Clear Search`, then tree will focus back on this element.
 
 ### Copy Messages
 Upon selecting a message, a formatted version of this message is displayed in the box on the right side:
@@ -80,7 +80,7 @@ Upon selecting a message, a formatted version of this message is displayed in th
 You can then use the button `Copy To Clipboard` to copy it.
 
 ## ORAN Analysis
-By clicking on the right button `See ORAN Analysis`, the view switches from message display to 
+By clicking on the right button `See ORAN Analysis`, the view switches from message display to
 steps for Radio Configuration.
 
 ![ORAN Analysis](doc/oran_analysis.png)
@@ -89,7 +89,7 @@ Steps supported:
 - Netconf Client Connection
 - Supported O-RAN MPlane version display
 - Hardware Detection
-- Module Capabilities 
+- Module Capabilities
 - User Plane Configuration
 - Creation/Deletion of Low Level Endpoints
 - Creation of Low Level Links
@@ -108,11 +108,54 @@ NetConfparser zipfile is available in the [Releases tab](https://github.com/Aero
 Unzip it and launch NetConfParser.exe
 
 ## Building NetConfParser locally
+
+### Build the project
+
+> [!NOTE]
+> Tested using python 3.12 / python 3.13
+
+In a git bash terminal (can use mingw on windows for instance), Generate venv folder using:
+
+```markdown
+python -m venv venv
+```
+
+Activate it (Next time you can just run this to set the env for your shell)
+
+```markdown
+source venv\Scripts\activate
+```
+
+At this point you should see (venv) before your PS1.
+
+Install requirements
+```markdown
+python -m pip install -r requirements.txt
+```
+
+#### Note about Proxy when installing requirements
+
+If you are behind a proxy, ensure that your proxy settings are correctly configured. You can set the `HTTP_PROXY` and `HTTPS_PROXY` environment variables before installing the requirements:
+
+```bash
+export HTTP_PROXY=http://your-proxy:port
+export HTTPS_PROXY=http://your-proxy:port
+```
+Replace `your-proxy` and `port` with your proxy details.
+
+For instance **export https_proxy='135.245.192.7:8000'**
+
+### Run the app
+
+```bash
+python netconfparser.py
+```
+
+### Generate the release package
+
 NetConfParser can be built for Windows with pyinstaller
-*  pyinstaller --windowed --icon=fs.ico -F --onefile netconfparser.py --add-data "fs_ico_encoded;." --additional-hooks-dir=.
+*  pyinstaller --windowed --icon=fs.ico -F --onefile netconfparser.py --additional-hooks-dir=. --add-data "fs.ico;."
 
 * It will give an exe as output in dist folder
 Please zip it if you want to distribute it
 For Linux, you can use python netconfparser.py directly
-
-
