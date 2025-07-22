@@ -14,11 +14,13 @@ import xml.dom.minidom
 from Logger import logger
 import os
 import lzma
-
+import webbrowser
 
 VERSION = "1.4"
+APP_NAME = f"NetConfParser - {VERSION}"
 ENORMOUS_RPC=20000
 
+ICON_PATH = os.path.join(os.path.dirname(__file__), 'fs.ico')
 
 def wrap(string, length=100):
     return '\n'.join(textwrap.wrap(string, length))
@@ -235,14 +237,22 @@ class NetConfParserWindow(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.netconf_parser = None
-        self.title(f"NetConfParser - {VERSION}")
+        self.title(APP_NAME)
         try:
-            icon_path = os.path.join(os.path.dirname(__file__), 'fs.ico')
-            self.wm_iconbitmap(icon_path)
-            self.iconbitmap(icon_path)
+            self.wm_iconbitmap(ICON_PATH)
+            self.iconbitmap(ICON_PATH)
         except:
             pass
         self.state('zoomed')
+
+        self.menu_bar = tk.Menu(self)
+        self.config(menu=self.menu_bar)
+
+        help_menu = tk.Menu(self.menu_bar, tearoff=0)
+        help_menu.add_command(label="About", command=self.show_about_popup)
+        self.menu_bar.add_cascade(label="?", menu=help_menu)
+
+
         frame_l = tk.Frame(width=200, height=400)
         frame_r = tk.Frame(width=100, height=200)
 
@@ -428,3 +438,35 @@ class NetConfParserWindow(TkinterDnD.Tk):
     def clear_tree(self, event):
         self.result_box.clear_all()
         self.analysis_box.clear_all()
+
+    def show_about_popup(self):
+        """Display the About popup with app details."""
+        popup = tk.Toplevel(self)
+        popup.title("About NetConfParser")
+        popup.geometry("300x200")
+        popup.resizable(False, False)
+
+        # Add the app icon
+        try:
+            popup.iconbitmap(ICON_PATH)
+        except Exception as e:
+            print(f"Failed to set popup icon: {e}")
+
+        # Add app name
+        app_name_label = tk.Label(popup, text=APP_NAME, font=("Arial", 14, "bold"))
+        app_name_label.pack(pady=10)
+
+        # Add description
+        description = (
+            "NetConfParser is a tool designed to parse and analyze Netconf messages.\n"
+            "It provides a user-friendly interface to explore each message details."
+        )
+        description_label = tk.Label(popup, text=description, wraplength=280, justify="center")
+        description_label.pack(pady=10)
+
+        def open_github():
+            webbrowser.open("https://github.com/AeroFlorian/netconf-parser")
+
+        github_link = tk.Label(popup, text="GitHub Repository", fg="blue", cursor="hand2")
+        github_link.pack(pady=10)
+        github_link.bind("<Button-1>", lambda e: open_github())
