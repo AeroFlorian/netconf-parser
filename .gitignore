@@ -2,3 +2,4 @@
 NetConfParser.log
 dist/
 build/
+venv
