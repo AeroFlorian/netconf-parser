@@ -479,9 +479,9 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.center_popup(popup, 300, 200)
 
     def export_rpcs(self):
-        # if not self.result_box.messages:
-        #     tk.messagebox.showwarning("No Messages", "No parsed messages available to export. Did you parse a file first ?")
-        #     return
+        if not self.result_box.messages:
+            tk.messagebox.showwarning("No Messages", "No parsed messages available to export. Did you parse a file first ?")
+            return
         file_path = filedialog.asksaveasfilename(
             defaultextension=".txt",
             filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
