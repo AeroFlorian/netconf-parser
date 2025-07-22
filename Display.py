@@ -248,10 +248,13 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.menu_bar = tk.Menu(self)
         self.config(menu=self.menu_bar)
 
+        export_menu = tk.Menu(self.menu_bar, tearoff=0)
+        export_menu.add_command(label="Export RPCs to file", command=self.export_rpcs)
+        self.menu_bar.add_cascade(label="Export", menu=export_menu)
+
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about_popup)
         self.menu_bar.add_cascade(label="?", menu=help_menu)
-
 
         frame_l = tk.Frame(width=200, height=400)
         frame_r = tk.Frame(width=100, height=200)
@@ -445,6 +448,9 @@ class NetConfParserWindow(TkinterDnD.Tk):
         popup.title("About NetConfParser")
         popup.geometry("300x200")
         popup.resizable(False, False)
+        popup.transient(self)  # Make the popup a child of the main window
+        popup.grab_set()  # Freeze the popup inside the main window
+
 
         # Add the app icon
         try:
@@ -470,3 +476,69 @@ class NetConfParserWindow(TkinterDnD.Tk):
         github_link = tk.Label(popup, text="GitHub Repository", fg="blue", cursor="hand2")
         github_link.pack(pady=10)
         github_link.bind("<Button-1>", lambda e: open_github())
+        self.center_popup(popup, 300, 200)
+
+    def export_rpcs(self):
+        # if not self.result_box.messages:
+        #     tk.messagebox.showwarning("No Messages", "No parsed messages available to export. Did you parse a file first ?")
+        #     return
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")]
+        )
+        if not file_path:
+            return  # User canceled the file dialog
+
+        direction_popup = tk.Toplevel(self)
+        direction_popup.title("Select Export Direction")
+        direction_popup.iconbitmap(ICON_PATH)
+        direction_popup.resizable(False, False)
+        direction_popup.transient(self)  # Make the popup a child of the main window
+        direction_popup.grab_set()  # Freeze the popup inside the main window
+
+        # Popup dimension configuration & centering in main window.
+        self.center_popup(direction_popup, 300, 100)
+
+        label = tk.Label(direction_popup, text="Select the direction to export:")
+        label.pack(pady=2)
+
+        ALL_MESSAGES_SELECTION = "ALL"
+        direction_var = tk.StringVar(value=ALL_MESSAGES_SELECTION)  # Default value
+        directions = [ALL_MESSAGES_SELECTION] + [direction.name for direction in NetconfMessageDefs.Direction]
+        dropdown = tk.OptionMenu(direction_popup, direction_var, *directions)
+        dropdown.pack(pady=2)
+
+        # Function to handle export after selection
+        def handle_export():
+            direction = direction_var.get()
+            direction_popup.destroy()  # Close the popup
+
+            filtered_messages = []
+            for message in self.result_box.messages:
+                if direction == ALL_MESSAGES_SELECTION or message.direction.name == direction:
+                    filtered_messages.append(message)
+
+            try:
+                with open(file_path, "w", encoding="utf-8") as f:
+                    for message in filtered_messages:
+                        f.write(message.raw_data + "\n\n")
+                tk.messagebox.showinfo("Export Successful", f"Exported {len(filtered_messages)} RPCs to {file_path}.")
+            except Exception as e:
+                tk.messagebox.showerror("Export Failed", f"Failed to export RPCs: {e}")
+
+        export_button = tk.Button(direction_popup, text="Export", command=handle_export)
+        export_button.pack(pady=5)
+
+    def center_popup(self, popup, width, height):
+        """Center a popup window relative to the main window."""
+        # Calculate the position to center the popup
+        main_window_x = self.winfo_x()
+        main_window_y = self.winfo_y()
+        main_window_width = self.winfo_width()
+        main_window_height = self.winfo_height()
+
+        x = main_window_x + (main_window_width // 2) - (width // 2)
+        y = main_window_y + (main_window_height // 2) - (height // 2)
+
+        # Set the geometry of the popup
+        popup.geometry(f"{width}x{height}+{x}+{y}")
