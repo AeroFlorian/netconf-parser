@@ -14,3 +14,4 @@ jobs:
         uses: googleapis/release-please-action@v4
         with:
           release-type: python
+          default-branch: ${{ github.ref_name }}
