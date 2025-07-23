@@ -16,8 +16,9 @@ import os
 import lzma
 import webbrowser
 from __version__ import __version__
+import Utils
 
-APP_NAME = f"NetConfParser - {__version__}"
+APP_NAME = f"NetConfParser - {__version__}{ " - DEV" if Utils.is_dev_mode() else ""}"
 ENORMOUS_RPC=20000
 
 ICON_PATH = os.path.join(os.path.dirname(__file__), 'fs.ico')
