@@ -76,8 +76,40 @@ def pretty_print_xml(xml_str: str):
     pps = re.sub(r'<.xml version="1.0" .>\n', "", pps)
     return pps
 
+class BaseTreeview(ttk.Treeview):
+    """
+    Base class to extend tree view with right click menu feature, to easily copy its content to the clipboard
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class ResultBox(ttk.Treeview):
+        # Create a context menu
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Copy", command=self.copy_cell_content)
+
+        # Bind right-click to show the context menu
+        self.bind("<Button-3>", self.show_context_menu)
+
+    def show_context_menu(self, event):
+        """Display the context menu at the cursor position."""
+        item = self.identify_row(event.y)
+        if item:
+            self.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+
+    def copy_cell_content(self):
+        selected_item = self.selection()
+        if selected_item:
+            item_values = self.item(selected_item[0], "values")
+            column = self.identify_column(self.winfo_pointerx() - self.winfo_rootx())
+            column_index = int(column[1:]) - 1  # Convert column ID (e.g., "#1") to index
+            if 0 <= column_index < len(item_values):
+                self.clipboard_clear()
+                self.clipboard_append(item_values[column_index])
+                self.update()
+
+
+class ResultBox(BaseTreeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text, filter_text: tk.Entry, parse_enormous_rpc: tk.IntVar, pb: ttk.Progressbar, label: tk.Label):
         super().__init__(master=frame, columns=("timestamp", "id", "direction", "type", "data", "data2", "xml"),
                          displaycolumns=("timestamp", "id", "direction", "type", "data", "data2"))
@@ -173,7 +205,7 @@ class ResultBox(ttk.Treeview):
 
 
 
-class AnalysisBox(ttk.Treeview):
+class AnalysisBox(BaseTreeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text):
         super().__init__(master=frame, columns=("timestamp", "msg-id", "category", "status", "information", "data2"))
         self.column("#0", width=25, minwidth=10, stretch=tk.NO)
