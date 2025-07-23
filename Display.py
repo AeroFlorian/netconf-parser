@@ -16,7 +16,7 @@ import os
 import lzma
 import webbrowser
 
-VERSION = "1.5"
+VERSION = "1.6"
 APP_NAME = f"NetConfParser - {VERSION}"
 ENORMOUS_RPC=20000
 
