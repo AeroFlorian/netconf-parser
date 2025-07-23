@@ -350,9 +350,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         clear_tree_button.bind("<Button-1>", self.clear_tree)
         clear_tree_button.place(y=20, x=920, width=200)
         result_box.drop_target_register(DND_FILES)
-        result_box.dnd_bind('<<Drop>>', self.load_file)
         analysis_box.drop_target_register(DND_FILES)
-        analysis_box.bind('<<Drop>>', self.load_file)
 
         result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
 
@@ -397,10 +395,20 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.oran_analysis = oran_analysis
         self.copy_to_clip = copy_to_clip
 
+        self.enable_drop_for_result_box() # Only the visible box should have the drag & drop
+
     def open_dialog_and_load_file(self, event):
         f = filedialog.askopenfile()
         if f:
             self.load_and_parse_file(f.name)
+
+    def enable_drop_for_result_box(self):
+        self.result_box.dnd_bind('<<Drop>>', self.load_file)
+        self.analysis_box.unbind('<<Drop>>')
+
+    def enable_drop_for_analysis_box(self):
+        self.analysis_box.dnd_bind('<<Drop>>', self.load_file)
+        self.result_box.unbind('<<Drop>>')
 
     def extract_xz_file(self, file_path, output_path):
         try:
@@ -421,11 +429,12 @@ class NetConfParserWindow(TkinterDnD.Tk):
             return output_path
         return file_path
 
-    def load_file(self, file):
+    def load_file(self, event):
         try:
-            if self.is_xz_file(file.data):
-                file.data = self.handle_xz_file(file.data)
-            self.load_and_parse_file(file.data)
+            file = event.data.strip("{}")  # Remove curly braces if present
+            if self.is_xz_file(file):
+                file = self.handle_xz_file(file)
+            self.load_and_parse_file(file)
         except Exception as e:
             tk.messagebox.showerror("Error", f"Failed to handle file: {e}")
 
@@ -481,6 +490,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.sb2.config(command=self.analysis_box.xview)
 
         self.update_search_buttons(enable=False)
+        self.enable_drop_for_analysis_box()
 
     def back_to_tree_view(self, event):
         self.back_to_tree.pack_forget()
@@ -493,6 +503,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.sb2.config(command=self.result_box.xview)
 
         self.update_search_buttons(enable=True)
+        self.enable_drop_for_result_box()
 
     def copy_to_clipboard(self, event):
         self.clipboard_clear()
