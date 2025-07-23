@@ -315,16 +315,16 @@ class NetConfParserWindow(TkinterDnD.Tk):
         parse_enormous_rpc = tk.IntVar()
         parse_snapshot = tk.Checkbutton(master=frame_r, text='Parse Enormous RPCs', variable=parse_enormous_rpc,
                                         onvalue=1, offvalue=0)
-        filter_text = tk.Entry(master=frame_l)
-        filter_button = tk.Button(master=frame_l, text="Filter")
-        clear_button = tk.Button(master=frame_l, text="Clear Search")
+        self.filter_text = tk.Entry(master=frame_l)
+        self.filter_button = tk.Button(master=frame_l, text="Filter")
+        self.clear_button = tk.Button(master=frame_l, text="Clear Search")
         clear_tree_button = tk.Button(master=frame_l, text="Clear Tree")
 
         message_text_box = tk.Text(master=frame_r, width=20, height=20)
         pb = ttk.Progressbar(frame_r, orient='vertical', mode='determinate', length=280)
         label_pb = ttk.Label(frame_r, text="0%")
 
-        result_box = ResultBox(frame_l, message_text_box, filter_text, parse_enormous_rpc, pb, label_pb)
+        result_box = ResultBox(frame_l, message_text_box, self.filter_text, parse_enormous_rpc, pb, label_pb)
 
         copy_to_clip = tk.Button(master=frame_r, text="Copy To Clipboard")
 
@@ -342,11 +342,11 @@ class NetConfParserWindow(TkinterDnD.Tk):
 
         analysis_box = AnalysisBox(frame_l, message_text_box)
 
-        filter_text.place(y=20, x=50, width=400)
-        filter_button.bind("<Button-1>", result_box.search)
-        filter_button.place(y=20, x=500, width=200)
-        clear_button.bind("<Button-1>", result_box.clear_search)
-        clear_button.place(y=20, x=710, width=200)
+        self.filter_text.place(y=20, x=50, width=400)
+        self.filter_button.bind("<Button-1>", result_box.search)
+        self.filter_button.place(y=20, x=500, width=200)
+        self.clear_button.bind("<Button-1>", result_box.clear_search)
+        self.clear_button.place(y=20, x=710, width=200)
         clear_tree_button.bind("<Button-1>", self.clear_tree)
         clear_tree_button.place(y=20, x=920, width=200)
         result_box.drop_target_register(DND_FILES)
@@ -463,6 +463,13 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.result_box.pack_forget()
         self.analysis_box.pack_forget()
 
+    def update_search_buttons(self, enable: bool):
+        """In Oran analysis, search is not implemented so grey out these buttons & fields"""
+        state = "normal" if enable else "disabled"
+        self.filter_text.config(state=state)
+        self.filter_button.config(state=state)
+        self.clear_button.config(state=state)
+
     def launch_oran_analysis(self, event):
         self.back_to_tree.pack()
         self.oran_analysis.pack_forget()
@@ -473,6 +480,8 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.sb.config(command=self.analysis_box.yview)
         self.sb2.config(command=self.analysis_box.xview)
 
+        self.update_search_buttons(enable=False)
+
     def back_to_tree_view(self, event):
         self.back_to_tree.pack_forget()
         self.oran_analysis.pack()
@@ -482,6 +491,8 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.result_box.config(yscrollcommand=self.sb.set)
         self.sb.config(command=self.result_box.yview)
         self.sb2.config(command=self.result_box.xview)
+
+        self.update_search_buttons(enable=True)
 
     def copy_to_clipboard(self, event):
         self.clipboard_clear()
