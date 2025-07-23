@@ -97,16 +97,22 @@ class BaseTreeview(ttk.Treeview):
             self.selection_set(item)
             self.context_menu.post(event.x_root, event.y_root)
 
-    def copy_cell_content(self):
+    def get_cell_content(self):
         selected_item = self.selection()
         if selected_item:
             item_values = self.item(selected_item[0], "values")
             column = self.identify_column(self.winfo_pointerx() - self.winfo_rootx())
             column_index = int(column[1:]) - 1  # Convert column ID (e.g., "#1") to index
             if 0 <= column_index < len(item_values):
-                self.clipboard_clear()
-                self.clipboard_append(item_values[column_index])
-                self.update()
+                return item_values[column_index]
+        return None
+
+    def copy_cell_content(self):
+        cell_value = self.get_cell_content()
+        if cell_value:
+            self.clipboard_clear()
+            self.clipboard_append(cell_value)
+            self.update()
 
 
 class ResultBox(BaseTreeview):
@@ -138,6 +144,9 @@ class ResultBox(BaseTreeview):
         self.filter_text.bind("<Return>", self.search)
         self.pb = pb
         self.label = label
+
+        # only available for result box
+        self.context_menu.add_command(label="Search", command=self.search_cell_content)
 
     def add_messages(self, messages: list[NetconfMessageDefs.Message]):
         self.pb.pack(fill=tk.Y, pady=30)
@@ -203,7 +212,17 @@ class ResultBox(BaseTreeview):
         if selected_item:
             self.see(selected_item)
 
+    def search_cell_content(self):
+        """Search based on the content of the selected cell."""
+        cell_value = self.get_cell_content()
+        if cell_value:
+            self.perform_search(cell_value)
 
+    def perform_search(self, query):
+        self.filter_text.delete(0, tk.END)
+        self.filter_text.insert(0, query)
+        self.clear_search(None)
+        self.search(None)
 
 class AnalysisBox(BaseTreeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text):
