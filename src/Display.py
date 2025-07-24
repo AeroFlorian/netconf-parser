@@ -15,10 +15,10 @@ from Logger import logger
 import os
 import lzma
 import webbrowser
-from src.version import __version__
+from version import __version__
 import Utils
 
-APP_NAME = f"NetConfParser - {__version__}{ " - DEV" if Utils.is_dev_mode() else ""}"
+APP_NAME = f"NetConfParser - {__version__}{ " - DEV TEST" if Utils.is_dev_mode() else ""}"
 ENORMOUS_RPC=20000
 
 ICON_PATH = os.path.join(os.path.dirname(__file__), 'fs.ico')

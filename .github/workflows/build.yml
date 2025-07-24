@@ -15,8 +15,9 @@ jobs:
         uses: JackMcKew/pyinstaller-action-windows@main
         with:
           path: src
+          spec: netconfparser.spec
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: src/dist/windows/*
+          files: dist/windows/*
