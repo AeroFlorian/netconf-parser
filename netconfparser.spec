@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\netconfparser.py'],
     pathex=[],
     binaries=[],
-    datas=[('src/fs.ico', '.')],
+    datas=[('src/*', '.')],
     hiddenimports=[],
     hookspath=['.'],
     hooksconfig={},

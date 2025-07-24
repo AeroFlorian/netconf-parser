@@ -154,7 +154,7 @@ python src/netconfparser.py
 ### Generate the release package
 
 NetConfParser can be built for Windows with pyinstaller
-*  pyinstaller --windowed --icon=src/fs.ico -F --onefile src/netconfparser.py --additional-hooks-dir=. --add-data "src/fs.ico;."
+*  pyinstaller --windowed --icon=src/fs.ico -F --onefile src/netconfparser.py --additional-hooks-dir=. --add-data "src/*;."
 
 * If spec file is already generated, you can also use **pyinstaller netconfparser.spec**
 
