@@ -1,3 +1,5 @@
 tkinterdnd2
 xmltodict
 pyinstaller
+pylint
+pytest
