@@ -16,3 +16,4 @@ jobs:
           release-type: python
           target-branch: ${{ github.ref_name }}
           # component: netconfparser #not needed since single component
+          token: ${{ secrets.GH_RELEASE_TOKEN }}
