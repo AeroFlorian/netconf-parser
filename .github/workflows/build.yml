@@ -1,4 +1,4 @@
-name: Package and Upload Executable
+name: Package and Upload Executable on release
 
 on:
   release:

@@ -171,6 +171,16 @@ Release-please action is setup so that it generates a pull request automatically
 
 It also automatically generates a changelog and increment the version number, and whenever the pull request is merged, it will generate a new release containing the changelog.
 
+> [!NOTE]
+> It is important to follow the conventional commit convention to have the fix/features/breaking changes automatically increment the version
+
+> [!NOTE]
+> You can force a version number by creating an empty commit like that:
+>
+> **git commit --allow-empty -m "chore: release 1.6.0" -m "Release-As: 1.6.0"**
+
+
+
 ### pyinstaller
 
 Once a new release is done, the pyinstaller action will run automatically and attach the generated binary to the latest release note
