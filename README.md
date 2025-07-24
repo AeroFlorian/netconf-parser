@@ -130,7 +130,7 @@ At this point you should see (venv) before your PS1.
 
 Install requirements
 ```markdown
-python -m pip install -r src/requirements.txt
+python -m pip install -r requirements.txt
 ```
 
 #### Note about Proxy when installing requirements
