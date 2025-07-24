@@ -130,7 +130,7 @@ At this point you should see (venv) before your PS1.
 
 Install requirements
 ```markdown
-python -m pip install -r requirements.txt
+python -m pip install -r src/requirements.txt
 ```
 
 #### Note about Proxy when installing requirements
@@ -161,3 +161,16 @@ NetConfParser can be built for Windows with pyinstaller
 * It will give an exe as output in dist folder
 Please zip it if you want to distribute it
 For Linux, you can use python netconfparser.py directly
+
+
+## Github actions
+
+### release-please
+
+Release-please action is setup so that it generates a pull request automatically, based on the content of the commit messages since last release.
+
+It also automatically generates a changelog and increment the version number, and whenever the pull request is merged, it will generate a new release containing the changelog.
+
+### pyinstaller
+
+Once a new release is done, the pyinstaller action will run automatically and attach the generated binary to the latest release note
