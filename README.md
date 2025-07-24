@@ -148,13 +148,15 @@ For instance **export https_proxy='135.245.192.7:8000'**
 ### Run the app
 
 ```bash
-python netconfparser.py
+python src/netconfparser.py
 ```
 
 ### Generate the release package
 
 NetConfParser can be built for Windows with pyinstaller
-*  pyinstaller --windowed --icon=fs.ico -F --onefile netconfparser.py --additional-hooks-dir=. --add-data "fs.ico;."
+*  pyinstaller --windowed --icon=fs.ico -F --onefile src/netconfparser.py --additional-hooks-dir=. --add-data "fs.ico;."
+
+* If spec file is already generated, you can also use **pyinstaller src/netconfparser.spec**
 
 * It will give an exe as output in dist folder
 Please zip it if you want to distribute it
