@@ -17,6 +17,8 @@ import lzma
 import webbrowser
 from version import __version__
 import Utils
+import Constants
+import UpdateChecker
 
 APP_NAME = f"NetConfParser - {__version__}{ ' - DEV' if Utils.is_dev_mode() else ''}"
 ENORMOUS_RPC=20000
@@ -398,6 +400,8 @@ class NetConfParserWindow(TkinterDnD.Tk):
 
         self.enable_drop_for_result_box() # Only the visible box should have the drag & drop
 
+        threading.Thread(target=UpdateChecker.check_for_updates, daemon=True).start()
+
     def open_dialog_and_load_file(self, event):
         f = filedialog.askopenfile()
         if f:
@@ -545,7 +549,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         description_label.pack(pady=10)
 
         def open_github():
-            webbrowser.open("https://github.com/AeroFlorian/netconf-parser")
+            webbrowser.open(Constants.GITHUB_REPO_URL)
 
         github_link = tk.Label(popup, text="GitHub Repository", fg="blue", cursor="hand2")
         github_link.pack(pady=10)
