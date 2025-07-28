@@ -16,7 +16,7 @@ import os
 import lzma
 import webbrowser
 
-VERSION = "1.5"
+VERSION = "1.6"
 APP_NAME = f"NetConfParser - {VERSION}"
 ENORMOUS_RPC=20000
 
@@ -76,8 +76,46 @@ def pretty_print_xml(xml_str: str):
     pps = re.sub(r'<.xml version="1.0" .>\n', "", pps)
     return pps
 
+class BaseTreeview(ttk.Treeview):
+    """
+    Base class to extend tree view with right click menu feature, to easily copy its content to the clipboard
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class ResultBox(ttk.Treeview):
+        # Create a context menu
+        self.context_menu = tk.Menu(self, tearoff=0)
+        self.context_menu.add_command(label="Copy", command=self.copy_cell_content)
+
+        # Bind right-click to show the context menu
+        self.bind("<Button-3>", self.show_context_menu)
+
+    def show_context_menu(self, event):
+        """Display the context menu at the cursor position."""
+        item = self.identify_row(event.y)
+        if item:
+            self.selection_set(item)
+            self.context_menu.post(event.x_root, event.y_root)
+
+    def get_cell_content(self):
+        selected_item = self.selection()
+        if selected_item:
+            item_values = self.item(selected_item[0], "values")
+            column = self.identify_column(self.winfo_pointerx() - self.winfo_rootx())
+            column_index = int(column[1:]) - 1  # Convert column ID (e.g., "#1") to index
+            if 0 <= column_index < len(item_values):
+                return item_values[column_index]
+        return None
+
+    def copy_cell_content(self):
+        cell_value = self.get_cell_content()
+        if cell_value:
+            self.clipboard_clear()
+            self.clipboard_append(cell_value)
+            self.update()
+
+
+class ResultBox(BaseTreeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text, filter_text: tk.Entry, parse_enormous_rpc: tk.IntVar, pb: ttk.Progressbar, label: tk.Label):
         super().__init__(master=frame, columns=("timestamp", "id", "direction", "type", "data", "data2", "xml"),
                          displaycolumns=("timestamp", "id", "direction", "type", "data", "data2"))
@@ -106,6 +144,9 @@ class ResultBox(ttk.Treeview):
         self.filter_text.bind("<Return>", self.search)
         self.pb = pb
         self.label = label
+
+        # only available for result box
+        self.context_menu.add_command(label="Search", command=self.search_cell_content)
 
     def add_messages(self, messages: list[NetconfMessageDefs.Message]):
         self.pb.pack(fill=tk.Y, pady=30)
@@ -171,9 +212,19 @@ class ResultBox(ttk.Treeview):
         if selected_item:
             self.see(selected_item)
 
+    def search_cell_content(self):
+        """Search based on the content of the selected cell."""
+        cell_value = self.get_cell_content()
+        if cell_value:
+            self.perform_search(cell_value)
 
+    def perform_search(self, query):
+        self.filter_text.delete(0, tk.END)
+        self.filter_text.insert(0, query)
+        self.clear_search(None)
+        self.search(None)
 
-class AnalysisBox(ttk.Treeview):
+class AnalysisBox(BaseTreeview):
     def __init__(self, frame: tk.Frame, text_box: tk.Text):
         super().__init__(master=frame, columns=("timestamp", "msg-id", "category", "status", "information", "data2"))
         self.column("#0", width=25, minwidth=10, stretch=tk.NO)
@@ -264,16 +315,16 @@ class NetConfParserWindow(TkinterDnD.Tk):
         parse_enormous_rpc = tk.IntVar()
         parse_snapshot = tk.Checkbutton(master=frame_r, text='Parse Enormous RPCs', variable=parse_enormous_rpc,
                                         onvalue=1, offvalue=0)
-        filter_text = tk.Entry(master=frame_l)
-        filter_button = tk.Button(master=frame_l, text="Filter")
-        clear_button = tk.Button(master=frame_l, text="Clear Search")
+        self.filter_text = tk.Entry(master=frame_l)
+        self.filter_button = tk.Button(master=frame_l, text="Filter")
+        self.clear_button = tk.Button(master=frame_l, text="Clear Search")
         clear_tree_button = tk.Button(master=frame_l, text="Clear Tree")
 
         message_text_box = tk.Text(master=frame_r, width=20, height=20)
         pb = ttk.Progressbar(frame_r, orient='vertical', mode='determinate', length=280)
         label_pb = ttk.Label(frame_r, text="0%")
 
-        result_box = ResultBox(frame_l, message_text_box, filter_text, parse_enormous_rpc, pb, label_pb)
+        result_box = ResultBox(frame_l, message_text_box, self.filter_text, parse_enormous_rpc, pb, label_pb)
 
         copy_to_clip = tk.Button(master=frame_r, text="Copy To Clipboard")
 
@@ -291,17 +342,15 @@ class NetConfParserWindow(TkinterDnD.Tk):
 
         analysis_box = AnalysisBox(frame_l, message_text_box)
 
-        filter_text.place(y=20, x=50, width=400)
-        filter_button.bind("<Button-1>", result_box.search)
-        filter_button.place(y=20, x=500, width=200)
-        clear_button.bind("<Button-1>", result_box.clear_search)
-        clear_button.place(y=20, x=710, width=200)
+        self.filter_text.place(y=20, x=50, width=400)
+        self.filter_button.bind("<Button-1>", result_box.search)
+        self.filter_button.place(y=20, x=500, width=200)
+        self.clear_button.bind("<Button-1>", result_box.clear_search)
+        self.clear_button.place(y=20, x=710, width=200)
         clear_tree_button.bind("<Button-1>", self.clear_tree)
         clear_tree_button.place(y=20, x=920, width=200)
         result_box.drop_target_register(DND_FILES)
-        result_box.dnd_bind('<<Drop>>', self.load_file)
         analysis_box.drop_target_register(DND_FILES)
-        analysis_box.bind('<<Drop>>', self.load_file)
 
         result_box.pack(anchor="center", expand=True, fill=tk.BOTH, pady=60)
 
@@ -346,10 +395,20 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.oran_analysis = oran_analysis
         self.copy_to_clip = copy_to_clip
 
+        self.enable_drop_for_result_box() # Only the visible box should have the drag & drop
+
     def open_dialog_and_load_file(self, event):
         f = filedialog.askopenfile()
         if f:
             self.load_and_parse_file(f.name)
+
+    def enable_drop_for_result_box(self):
+        self.result_box.dnd_bind('<<Drop>>', self.load_file)
+        self.analysis_box.unbind('<<Drop>>')
+
+    def enable_drop_for_analysis_box(self):
+        self.analysis_box.dnd_bind('<<Drop>>', self.load_file)
+        self.result_box.unbind('<<Drop>>')
 
     def extract_xz_file(self, file_path, output_path):
         try:
@@ -370,11 +429,12 @@ class NetConfParserWindow(TkinterDnD.Tk):
             return output_path
         return file_path
 
-    def load_file(self, file):
+    def load_file(self, event):
         try:
-            if self.is_xz_file(file.data):
-                file.data = self.handle_xz_file(file.data)
-            self.load_and_parse_file(file.data)
+            file = event.data.strip("{}")  # Remove curly braces if present
+            if self.is_xz_file(file):
+                file = self.handle_xz_file(file)
+            self.load_and_parse_file(file)
         except Exception as e:
             tk.messagebox.showerror("Error", f"Failed to handle file: {e}")
 
@@ -412,6 +472,13 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.result_box.pack_forget()
         self.analysis_box.pack_forget()
 
+    def update_search_buttons(self, enable: bool):
+        """In Oran analysis, search is not implemented so grey out these buttons & fields"""
+        state = "normal" if enable else "disabled"
+        self.filter_text.config(state=state)
+        self.filter_button.config(state=state)
+        self.clear_button.config(state=state)
+
     def launch_oran_analysis(self, event):
         self.back_to_tree.pack()
         self.oran_analysis.pack_forget()
@@ -422,6 +489,9 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.sb.config(command=self.analysis_box.yview)
         self.sb2.config(command=self.analysis_box.xview)
 
+        self.update_search_buttons(enable=False)
+        self.enable_drop_for_analysis_box()
+
     def back_to_tree_view(self, event):
         self.back_to_tree.pack_forget()
         self.oran_analysis.pack()
@@ -431,6 +501,9 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.result_box.config(yscrollcommand=self.sb.set)
         self.sb.config(command=self.result_box.yview)
         self.sb2.config(command=self.result_box.xview)
+
+        self.update_search_buttons(enable=True)
+        self.enable_drop_for_result_box()
 
     def copy_to_clipboard(self, event):
         self.clipboard_clear()
