@@ -308,6 +308,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
 
         help_menu = tk.Menu(self.menu_bar, tearoff=0)
         help_menu.add_command(label="About", command=self.show_about_popup)
+        help_menu.add_command(label="Check for Update", command=self.check_for_update)
         self.menu_bar.add_cascade(label="?", menu=help_menu)
 
         frame_l = tk.Frame(width=200, height=400)
@@ -399,7 +400,9 @@ class NetConfParserWindow(TkinterDnD.Tk):
         self.copy_to_clip = copy_to_clip
 
         self.enable_drop_for_result_box() # Only the visible box should have the drag & drop
+        self.check_for_update()
 
+    def check_for_update(self):
         threading.Thread(target=UpdateChecker.check_for_updates, daemon=True).start()
 
     def open_dialog_and_load_file(self, event):
