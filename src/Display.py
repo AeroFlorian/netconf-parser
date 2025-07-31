@@ -15,9 +15,10 @@ from Logger import logger
 import os
 import lzma
 import webbrowser
+from version import __version__
+import Utils
 
-VERSION = "1.6"
-APP_NAME = f"NetConfParser - {VERSION}"
+APP_NAME = f"NetConfParser - {__version__}{ ' - DEV' if Utils.is_dev_mode() else ''}"
 ENORMOUS_RPC=20000
 
 ICON_PATH = os.path.join(os.path.dirname(__file__), 'fs.ico')
@@ -455,7 +456,7 @@ class NetConfParserWindow(TkinterDnD.Tk):
         # try:
         file_name = re.sub(r"{", "", file)
         file_name = re.sub(r"}", "", file_name)
-        self.title(f"NetConfParser - {VERSION} - {file_name}")
+        self.title(f"{APP_NAME} - {file_name}")
         with open(file_name, 'r') as f:
             data = '\n'.join(f.readlines())
             netconf_parser = MessageParser.NetConfParser(data)

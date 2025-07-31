@@ -148,14 +148,39 @@ For instance **export https_proxy='135.245.192.7:8000'**
 ### Run the app
 
 ```bash
-python netconfparser.py
+python src/netconfparser.py
 ```
 
 ### Generate the release package
 
 NetConfParser can be built for Windows with pyinstaller
-*  pyinstaller --windowed --icon=fs.ico -F --onefile netconfparser.py --additional-hooks-dir=. --add-data "fs.ico;."
+*  pyinstaller --windowed --icon=src/fs.ico -F --onefile src/netconfparser.py --additional-hooks-dir=. --add-data "src/*;."
+
+* If spec file is already generated, you can also use **pyinstaller netconfparser.spec**
 
 * It will give an exe as output in dist folder
 Please zip it if you want to distribute it
 For Linux, you can use python netconfparser.py directly
+
+
+## Github actions
+
+### release-please
+
+Release-please action is setup so that it generates a pull request automatically, based on the content of the commit messages since last release.
+
+It also automatically generates a changelog and increment the version number, and whenever the pull request is merged, it will generate a new release containing the changelog.
+
+> [!NOTE]
+> It is important to follow the conventional commit convention to have the fix/features/breaking changes automatically increment the version
+
+> [!NOTE]
+> You can force a version number by creating an empty commit like that:
+>
+> **git commit --allow-empty -m "chore: release 1.6.0" -m "Release-As: 1.6.0"**
+
+
+
+### pyinstaller
+
+Once a new release is done, the pyinstaller action will run automatically and attach the generated binary to the latest release note

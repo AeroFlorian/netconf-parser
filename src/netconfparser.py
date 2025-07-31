@@ -2,8 +2,7 @@ import Display
 from Logger import logger
 import traceback
 
-if __name__ == '__main__':
-
+def main():
     try:
         window = Display.NetConfParserWindow()
         window.mainloop()
@@ -11,3 +10,6 @@ if __name__ == '__main__':
         logger.error("Exception Caught!")
         for l in traceback.format_exc().splitlines():
             logger.error(l)
+
+if __name__ == '__main__':
+    main()
