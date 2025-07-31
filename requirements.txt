@@ -1,5 +1,7 @@
 tkinterdnd2
 xmltodict
 pyinstaller
+# For Update check on startup
+requests
 pylint
 pytest
