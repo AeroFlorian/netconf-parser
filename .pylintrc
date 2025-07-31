@@ -1,0 +1,65 @@
+[MASTER]
+init-hook='import sys; sys.path.append("src")'
+
+# Specify a configuration file.
+rcfile=
+
+# Python code to analyze
+ignore=venv,build,dist
+
+# Add files or directories to the blacklist. They should be base names, not paths.
+ignore-patterns=
+
+# Specify a comma-separated list of module names that are considered as "safe" to import.
+extension-pkg-whitelist=tkinter
+
+# Set the Python version for type inference
+py-version=3.11
+
+[MESSAGES CONTROL]
+# Disable the following messages:
+disable=
+    missing-docstring,          # Allow missing docstrings in functions/classes
+    invalid-name,               # Allow non-standard variable names (e.g., x, y)
+    too-few-public-methods,     # Allow classes with fewer than 2 public methods
+    too-many-arguments,         # Allow functions with more than 5 arguments
+    too-many-locals,            # Allow functions with many local variables
+    too-many-instance-attributes, # Allow classes with many attributes
+    duplicate-code,              # Disable duplicate code warnings
+    wrong-import-order
+
+[REPORTS]
+# Set the output format. Options: text, parseable, colorized, json, msvs (visual studio), html
+output-format=text
+
+# Disable the report summary at the end of the output
+reports=no
+
+[FORMAT]
+# Maximum number of characters on a single line.
+max-line-length=160
+
+# String used as indentation unit.
+indent-string='    '
+
+[DESIGN]
+# Maximum number of arguments for a function/method.
+max-args=10
+
+# Maximum number of attributes for a class.
+max-attributes=15
+
+# Maximum number of public methods for a class.
+max-public-methods=20
+
+[IMPORTS]
+# Allow wildcard imports from modules
+allow-wildcard-with-all=no
+
+# Allow imports to be grouped by type (standard, third-party, local)
+known-standard-library=tkinter,os,sys,re,uuid,threading,textwrap,webbrowser
+known-third-party=tkinterdnd2,pytest
+
+[LOGGING]
+# Allow string interpolation in logging functions
+logging-format-style=old
