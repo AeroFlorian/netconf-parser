@@ -45,7 +45,11 @@ class LineRemover:
                                  r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z Dbg: .*? Session \d+: (?:Sending|Received) message:",
                                  ""),
             LineRemoverRegexRule("Sending",
-                                 r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{7} INF (?:Sending|Received) message: ", "")]
+                                 r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}.\d{3,}.*(?:Sending|Received)( message)?: ", ""),
+            LineRemoverRegexRule("Received",
+                                 r"\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}.\d{3,}.*(?:Sending|Received)( message)?: ", "")
+        ]
+
 
     def remove_unwanted_parts(self, full_lines: str):
         for rule in self.rules:

@@ -4,7 +4,6 @@ import LineRemover
 import re
 from Logger import logger
 import TimestampComputer
-import traceback
 
 class NetconfSession:
     def __init__(self):
@@ -114,25 +113,6 @@ class Trees:
         self.analysis_tree.check_message_counterpart()
 
 
-class RegexToNetconfMessage:
-    def __init__(self, match, timestampcomputer):
-        self.match = match
-        self.timestampcomputer = timestampcomputer
-
-    def to_netconf_message(self):
-        if self.match[0] != '':
-            return NetconfMessageDefs.RpcMessage(self.match[0], self.match[1], self.timestampcomputer)
-        elif self.match[2] != '':
-            return NetconfMessageDefs.RpcReplyMessage(self.match[2], self.match[3], self.timestampcomputer)
-        elif self.match[4] != '':
-            return NetconfMessageDefs.NotificationMessage(self.match[4], self.timestampcomputer)
-        elif self.match[5] != '':
-            return NetconfMessageDefs.HelloMessage(self.match[5])
-        else:
-            logger.error('RegexToNetconfMessage.to_netconf_message() not implemented')
-            return None
-
-
 class NetConfParser:
     def __init__(self, data: str):
         self.data = data
@@ -142,18 +122,23 @@ class NetConfParser:
     def parse(self):
         self.timestamp_computer.parse(self.data)
         filtered_lines = LineRemover.LineRemover().remove_unwanted_parts(self.data)
-        reg = r'<rpc .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc>|' \
-              r'<rpc-reply .*? message-id=.([a-z0-9\-\:]+).>(.*?)</rpc-reply>|' \
-              r'<notification .*?/eventTime>(.*?)</notification>|' \
-              r'<hello xmlns=\".*?\">(.*?)</hello>'
 
+        # logger.info(f"Filtered lines: {filtered_lines}")
+
+        reg = r'(<rpc-reply[\s\S]*?</rpc-reply>)|(<notification[\s\S]*?</notification>)|(<hello[\s\S]*?</hello>)|(<rpc[\s\S]*?</rpc>)|'
         all_matches = re.findall(reg, filtered_lines, re.MULTILINE | re.DOTALL)
-        for match in all_matches:
+        # logger.info(f"All matches: {all_matches}")
+
+        for match_tuple in all_matches:
+            # Only one group will be non-empty per match
+            xml_str = next((m for m in match_tuple if m), None)
+            if not xml_str:
+                continue
             try:
-                message = RegexToNetconfMessage(match, self.timestamp_computer).to_netconf_message()
+                message = NetconfMessageDefs.Message.from_xml(xml_str, self.timestamp_computer)
                 self.trees.handle_message(message)
             except Exception as e:
-                print(traceback.format_exc())
+                logger.exception(f"Failed to parse message: {xml_str}")
         self.trees.apply_after_computation_tags()
         return
 

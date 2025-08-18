@@ -3,6 +3,7 @@ from Logger import logger
 import re
 import xmltodict
 import TimestampComputer
+from lxml import etree
 
 
 class MessageType(Enum):
@@ -64,6 +65,29 @@ class Message:
         data = re.sub(r'\n', '', data, flags=re.DOTALL)
         return data
 
+    @staticmethod
+    def from_xml(xml_str : str, timestampcomputer : TimestampComputer) -> "Message":
+        try:
+            root = etree.fromstring(xml_str.encode('utf-8'))
+        except Exception as e:
+            logger.error(f"lxml parse error: {e}\nXML: {xml_str}")
+            return None
+
+        tag = root.tag.split('}')[-1] if '}' in root.tag else root.tag
+        if tag == 'rpc':
+            message_id = root.attrib.get('message-id', '')
+            return RpcMessage(message_id, xml_str, timestampcomputer)
+        elif tag == 'rpc-reply':
+            message_id = root.attrib.get('message-id', '')
+            return RpcReplyMessage(message_id, xml_str, timestampcomputer)
+        elif tag == 'notification':
+            return NotificationMessage(xml_str, timestampcomputer)
+        elif tag == 'hello':
+            return HelloMessage(xml_str)
+        else:
+            logger.error(f'RegexToNetconfMessage.to_netconf_message() not implemented for tag {tag}')
+            return None
+
     def received_reply(self):
         logger.error('Message.receive_reply() not implemented')
 
@@ -117,11 +141,11 @@ class RpcMessage(Message):
         return summary + " | ".join(operations)
 
     def fill_fields(self, data: str):
-        self.raw_data = self.remove_unwanted_parts(f'<rpc xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</rpc>')
+        self.raw_data = self.remove_unwanted_parts(data)
         data = re.sub(r' nc:operation=\"([^\"]+)\">', r"><operation>\1</operation>", data)
         data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
         data = re.sub('\n', '', data)
-        self.data = xmltodict.parse(self.remove_unwanted_parts(data))
+        self.data = xmltodict.parse(self.remove_unwanted_parts(data))["rpc"]
         if "get-schema" in self.raw_data:
             self.tag = Tag.SCHEMA
             self.summary = f"get-schema {self.data['get-schema']['identifier']}"
@@ -150,12 +174,9 @@ class RpcReplyMessage(Message):
         self.timestamp = timestampcomputer.get_timestamp(self.message_id)
 
     def fill_fields(self, data: str):
-        self.raw_data = self.remove_unwanted_parts(f'<rpc-reply xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</rpc-reply>')
+        self.raw_data = self.remove_unwanted_parts(data)
         if len(data) < 10000 and "rpc-error" in data:
-            data = f"<rpc-error>{data}</rpc-error>"
             self.tag = Tag.RPC_ERROR
-        else:
-            data = f"<rpc-reply>{data}</rpc-reply>"
         data = re.sub(r' [^ ]+=\"[^\"]+\"', '', data)
         data = re.sub(r'^.*?<', '<', data, flags=re.DOTALL)
         data = re.sub(r'>[^>]*?$', '>', data, flags=re.DOTALL)
@@ -176,12 +197,11 @@ class NotificationMessage(Message):
         self.timestamp = timestampcomputer.get_timestamp("notification")
 
     def fill_fields(self, data: str):
-        self.raw_data = self.remove_unwanted_parts(
-            f'<notification xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</notification>')
+        self.raw_data = self.remove_unwanted_parts(data)
         if "netconf-config-change" in data:
             self.tag = Tag.NOTIFICATION_NETCONF_CONFIG_CHANGE
         data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
-        self.data = xmltodict.parse(self.remove_unwanted_parts(data))
+        self.data = xmltodict.parse(self.remove_unwanted_parts(data))["notification"]
         self.summary = f"notification {''.join(self.data.keys())}"
 
 
@@ -192,11 +212,10 @@ class HelloMessage(Message):
         self.fill_fields(data)
 
     def fill_fields(self, data: str):
-        self.raw_data = self.remove_unwanted_parts(
-            f'<hello xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">{data}</hello>')
+        self.raw_data = self.remove_unwanted_parts(data)
         data = re.sub(r' xmlns[^ ]*=\"[^\"]+\"', '', data)
         data = re.sub(r'<session-id.*/session-id>', '', data)
-        self.data = xmltodict.parse(self.remove_unwanted_parts(data))
+        self.data = xmltodict.parse(self.remove_unwanted_parts(data))["hello"]
         capas = set()
         capabilities = list(self.data["capabilities"].values())
         if type(capabilities[0]) is list:

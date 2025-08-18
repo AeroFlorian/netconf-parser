@@ -5,3 +5,4 @@ pyinstaller
 requests
 pylint
 pytest
+lxml

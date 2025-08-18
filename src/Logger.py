@@ -46,4 +46,4 @@ class Logger:
         return self.logger
 
 
-logger = Logger('Logger', None, True).getLogger()
+logger = Logger('netconf-logger', None, True).getLogger()
